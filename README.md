@@ -1,4 +1,7 @@
-# MMM-SolarEdge
+# MMM-SunGrow
+# This is a rework of MMM-SolarEdge to MMM-SunGrow to work with SunGrow API
+# under contruction!!! Not usable at the moment!!!
+
 
 This is a module for the [MagicMirror²](https://github.com/MichMich/MagicMirror/).
 
