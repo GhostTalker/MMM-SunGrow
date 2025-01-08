@@ -60,7 +60,7 @@ module.exports = NodeHelper.create({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-access-key": this.config.appKey || ""
+          "x-access-key": this.config.secretKey || ""
         },
         body: JSON.stringify(body)
       });
