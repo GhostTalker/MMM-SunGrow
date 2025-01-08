@@ -125,8 +125,8 @@ module.exports = NodeHelper.create({
       const res = await fetch(url, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"//,
-          //"token": this.token            // if needed in the header
+          "Content-Type": "application/json",
+          "x-access-key": this.config.secretKey || ""
           // or "Authorization": `Bearer ${this.token}`, etc., depending on docs
         },
         body: JSON.stringify(body)
