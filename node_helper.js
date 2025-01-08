@@ -109,7 +109,7 @@ module.exports = NodeHelper.create({
     }
 
     try {
-      const url = "https://developer-api.isolarcloud.com/v1/plant/getPlantDetail";
+      const url = `${this.config.portalUrl}/openapi/getPowerStationDetail`;
       const body = {
         plantId: this.config.plantId
       };
