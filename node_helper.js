@@ -131,7 +131,7 @@ module.exports = NodeHelper.create({
         },
         body: JSON.stringify(body)
       });
-      console.log("[MMM-SunGrow] /openapi/login response:", body);
+      console.log("[MMM-SunGrow] /openapi/getPowerStationDetail:", res);
 
       if (!res.ok) {
         // Possibly the token expired? We might need to re-login.
