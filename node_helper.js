@@ -42,14 +42,14 @@ module.exports = NodeHelper.create({
   loginToISolarCloud: async function () {
     try {
       // Check if user + password are in config
-      if (!this.config.user || !this.config.password) {
+      if (!this.config.userName || !this.config.userPassword) {
         throw new Error("No user/password provided in config for iSolarCloud login.");
       }
 
       const loginUrl = "https://developer-api.isolarcloud.com/v1/common/login";
       const body = {
-        user: this.config.user,
-        password: this.config.password
+        user: this.config.userName,
+        password: this.config.userPassword
       };
 
       const res = await fetch(loginUrl, {
