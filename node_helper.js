@@ -52,7 +52,7 @@ module.exports = NodeHelper.create({
         user_account: this.config.userName || "",
         user_password: this.config.userPassword || "",
         lang. "_en_US",
-        sys_code: 207,
+        sys_code: "207",
         token: ""
       };
 
