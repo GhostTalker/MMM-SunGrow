@@ -46,10 +46,14 @@ module.exports = NodeHelper.create({
         throw new Error("No user/password provided in config for iSolarCloud login.");
       }
 
-      const loginUrl = "https://developer-api.isolarcloud.com/v1/common/login";
+      const loginUrl = `${this.config.portalUrl}/openapi/login`;
       const body = {
-        user: this.config.userName,
-        password: this.config.userPassword
+        appkey: this.config.appKey || "",
+        user_account: this.config.userName || "",
+        user_password: this.config.userPassword || "",
+        lang. "_en_US",
+        sys_code: 207,
+        token: ""
       };
 
       const res = await fetch(loginUrl, {
@@ -73,7 +77,7 @@ module.exports = NodeHelper.create({
       // Extract the token from the response
       // Typically: loginData.result_data.token
       this.token = loginData.result_data.token;
-      console.log("[MMM-SunGrow] Login successful, token:", this.token);
+      console.log("[MMM-SunGrow] /openapi/login response:", loginData);
 
       // Now that we have a token, let's fetch the plant data
       this.getSolarData();
