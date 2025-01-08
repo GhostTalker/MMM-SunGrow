@@ -52,14 +52,15 @@ module.exports = NodeHelper.create({
         user_account: this.config.userName || "",
         user_password: this.config.userPassword || "",
         lang: "_en_US",
-        sys_code: "207",
+        sys_code: "901",
         token: ""
       };
 
       const res = await fetch(loginUrl, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "x-access-key": this.config.appKey || ""
         },
         body: JSON.stringify(body)
       });
