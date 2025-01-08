@@ -1,8 +1,8 @@
 {
-	"name": "MMM-SolarEdge",
+	"name": "MMM-SunGrow",
 	"version": "1.0.0",
 	"description": "Todo: Insert description here!",
-	"main": "MMM-SolarEdge.js",
+	"main": "MMM-SunGrow.js",
 	"author": "Stefan Nachtrab",
 	"license": "MIT",
 	"devDependencies": {

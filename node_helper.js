@@ -1,7 +1,8 @@
 /* Magic Mirror
- * Node Helper: MMM-SolarEdge
+ * Module: MMM-SunGrow
  *
- * By Stefan Nachtrab
+ * By GhostTalker
+ * idea and original code from Stefan Nachtrab
  * MIT Licensed.
  */
 

@@ -1,27 +1,27 @@
 {% extends "templates/parent.njk" %}
 
 {% block pv_installation %}
-  <div class="solaredge-row solaredge-border-bottom">
-    <div class="solaredge-col">
-      <div class="solaredge-container">
-        <div class="solaredge-row">
-          <div class="solaredge-col solaredge-align-self-center">
-            <div class="solaredge-container">
-              <div class="solaredge-row">
-                <div class="solaredge-col solaredge-align-self-center">
+  <div class="sungrow-row sungrow-border-bottom">
+    <div class="sungrow-col">
+      <div class="sungrow-container">
+        <div class="sungrow-row">
+          <div class="sungrow-col sungrow-align-self-center">
+            <div class="sungrow-container">
+              <div class="sungrow-row">
+                <div class="sungrow-col sungrow-align-self-center">
                   {% if powerAndStatus.pv.status != "Idle" %}
                     <div class="small bright">{{ powerAndStatus.pv.power }} {{ powerAndStatus.unit }}</div>
                   {% endif %}
                   {% if powerAndStatus.pv.status == "Idle" %}
-                    <div class="small solaredge-color-stand-by">{{ "STAND_BY" | translate }}</div>
+                    <div class="small sungrow-color-stand-by">{{ "STAND_BY" | translate }}</div>
                   {% endif %}
                   {% if config.compactMode %}
-                    <div class="solaredge-compact-image"><img src="{{ config.moduleRelativePath }}/images/pv.svg"></div>
+                    <div class="sungrow-compact-image"><img src="{{ config.moduleRelativePath }}/images/pv.svg"></div>
                   {% else %}
                     <div><img src="{{ config.moduleRelativePath }}/images/pv.svg"></div>
                   {% endif %}
                 </div>
-                <div class="solaredge-col solaredge-mid solaredge-align-self-center">
+                <div class="sungrow-col sungrow-mid sungrow-align-self-center">
                   {% if arrowDirections.arrowPvLoad != "none" %}
                     <div><img src="{{ config.moduleRelativePath }}/images/arrow_{{ arrowDirections.arrowPvLoad }}.svg"></div>
                   {% endif %}
@@ -30,14 +30,14 @@
             </div>
           </div>
         </div>
-        <div class="solaredge-row">
-          <div class="solaredge-col solaredge-align-self-center">
-            <div class="solaredge-container">
-              <div class="solaredge-row">
-                <div class="solaredge-col solaredge-align-self-center">
-                  <div class="solaredge-chargelevel-relative">{{ powerAndStatus.storage.chargeLevel }} %</div>
+        <div class="sungrow-row">
+          <div class="sungrow-col sungrow-align-self-center">
+            <div class="sungrow-container">
+              <div class="sungrow-row">
+                <div class="sungrow-col sungrow-align-self-center">
+                  <div class="sungrow-chargelevel-relative">{{ powerAndStatus.storage.chargeLevel }} %</div>
                   {% if config.compactMode %}
-                    <div class="solaredge-compact-image">
+                    <div class="sungrow-compact-image">
                       <svg width="96px" height="96px" viewBox="0 0 96 96" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
                           <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
                               <g id="BATTERIES" transform="translate(0.000000, -378.000000)" fill-rule="nonzero">
@@ -70,13 +70,13 @@
                     </div>
                   {% endif %}
                   {% if powerAndStatus.storage.status != "Idle" %}
-                    <div class="small bright solaredge-batterylevel-relative">{{ powerAndStatus.storage.power }} {{ powerAndStatus.unit }}</div>
+                    <div class="small bright sungrow-batterylevel-relative">{{ powerAndStatus.storage.power }} {{ powerAndStatus.unit }}</div>
                   {% endif %}
                   {% if powerAndStatus.storage.status == "Idle" %}
-                    <div class="small solaredge-color-stand-by solaredge-batterylevel-relative">{{ "STAND_BY" | translate }}</div>
+                    <div class="small sungrow-color-stand-by sungrow-batterylevel-relative">{{ "STAND_BY" | translate }}</div>
                   {% endif %}
                 </div>
-                <div class="solaredge-col solaredge-mid solaredge-align-self-center">
+                <div class="sungrow-col sungrow-mid sungrow-align-self-center">
                   {% if arrowDirections.arrowStorageLoad != "none" %}
                     <div><img src="{{ config.moduleRelativePath }}/images/arrow_{{ arrowDirections.arrowStorageLoad }}.svg"></div>
                   {% endif %}
@@ -87,26 +87,26 @@
         </div>
       </div>
     </div>
-    <div class="solaredge-col solaredge-mid solaredge-align-self-center">
+    <div class="sungrow-col sungrow-mid sungrow-align-self-center">
       {% if config.compactMode %}
-        <div class="solaredge-compact-image"><img src="{{ config.moduleRelativePath }}/images/home.svg"></div>
+        <div class="sungrow-compact-image"><img src="{{ config.moduleRelativePath }}/images/home.svg"></div>
       {% else %}
         <div><img src="{{ config.moduleRelativePath }}/images/home.svg"></div>
       {% endif %}
       <div class="small bright">{{ powerAndStatus.load.power }} {{ powerAndStatus.unit }}</div>
     </div>
-    <div class="solaredge-col solaredge-align-self-center">
-      <div class="solaredge-col solaredge-align-self-center">
-        <div class="solaredge-container">
-          <div class="solaredge-row">
-            <div class="solaredge-col solaredge-mid solaredge-align-self-center">
+    <div class="sungrow-col sungrow-align-self-center">
+      <div class="sungrow-col sungrow-align-self-center">
+        <div class="sungrow-container">
+          <div class="sungrow-row">
+            <div class="sungrow-col sungrow-mid sungrow-align-self-center">
               {% if arrowDirections.arrowGridLoad != "none" %}
                 <div><img src="{{ config.moduleRelativePath }}/images/arrow_{{ arrowDirections.arrowGridLoad }}.svg"></div>
               {% endif %}
             </div>
-            <div class="solaredge-col solaredge-align-self-center">
+            <div class="sungrow-col sungrow-align-self-center">
               {% if config.compactMode %}
-                <div class="solaredge-compact-image"><img src="{{ config.moduleRelativePath }}/images/grid.svg"></div>
+                <div class="sungrow-compact-image"><img src="{{ config.moduleRelativePath }}/images/grid.svg"></div>
               {% else %}
                 <div><img src="{{ config.moduleRelativePath }}/images/grid.svg"></div>
               {% endif %}

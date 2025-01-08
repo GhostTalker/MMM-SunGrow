@@ -1,64 +1,64 @@
-.solaredge-container {
+.sungrow-container {
   width: 100%;
   max-width: 500px;
   margin-right: auto;
   margin-left: auto;
 }
 
-.solaredge-row {
+.sungrow-row {
   display: flex;
   flex-wrap: wrap;
 }
 
-.solaredge-col {
+.sungrow-col {
   flex: 1 0 0;
 }
 
-.solaredge-mid {
+.sungrow-mid {
   max-width: 30%;
 }
 
-.solaredge-align-self-center {
+.sungrow-align-self-center {
   align-self: center;
   text-align: center;
 }
 
-.solaredge-color-stand-by {
+.sungrow-color-stand-by {
   color: darkred;
 }
 
-.solaredge-border-bottom {
+.sungrow-border-bottom {
   border-bottom: 1px solid var(--color-text-dimmed);
 }
 
-.solaredge-text-align-left {
+.sungrow-text-align-left {
   text-align: left;
 }
 
-.solaredge-text-align-right {
+.sungrow-text-align-right {
   text-align: right;
 }
 
-.solaredge-chargelevel-relative {
+.sungrow-chargelevel-relative {
   position: relative;
   top: 30px;
 }
 
-.solaredge-batterylevel-relative {
+.sungrow-batterylevel-relative {
   position: relative;
   bottom: 15px;
 }
 
-.solaredge-compact {
+.sungrow-compact {
   margin-top: -12px;
 }
 
-.solaredge-compact-image {
+.sungrow-compact-image {
   margin-top: -12px;
   margin-bottom: -12px;
 }
 
-.solaredge-compact .solaredge-mid {
+.sungrow-compact .sungrow-mid {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -66,7 +66,7 @@
   left: 0;
 }
 
-.solaredge-compact img {
+.sungrow-compact img {
   width: 60%;
   height: 60%;
 }

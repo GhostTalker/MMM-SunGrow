@@ -1,28 +1,30 @@
 /* global Module */
 
 /* Magic Mirror
- * Module: MMM-SolarEdge
+ * Module: MMM-SunGrow
  *
- * By Stefan Nachtrab
+ * By GhostTalker
+ * idea and original code from Stefan Nachtrab
  * MIT Licensed.
  */
 
-Module.register("MMM-SolarEdge", {
+Module.register("MMM-SunGrow", {
   defaults: {
-    updateInterval: 5000,
     retryDelay: 5000,
-    siteId: undefined,
-    apiKey: undefined,
+    updateInterval: 5 * 60 * 1000,
+    appKey: "",
+    secretKey: "",
+    plantId: "",
+    appId: "",
     userName: undefined,
     userPassword: undefined,
     updateIntervalBasicData: 1000 * 60 * 15, //every 15 minutes
-    portalUrl: "https://monitoringapi.solaredge.com",
-    liveDataUrl: "https://monitoring.solaredge.com",
+    portalUrl: "https://gateway.isolarcloud.eu",
     showOverview: true,
     showDayEnergy: true,
     compactMode: false,
     decimal: "comma",
-    moduleRelativePath: "modules/MMM-SolarEdge", //workaround for nunjucks image location
+    moduleRelativePath: "modules/MMM-SunGrow", //workaround for nunjucks image location
     primes: [
       499, 997, 1499, 1997, 2503, 2999, 3499, 4001, 4493, 4999, 5501, 6007,
       6491, 7001, 7499, 7993, 8501, 8999, 9497, 9773
@@ -31,13 +33,13 @@ Module.register("MMM-SolarEdge", {
   },
 
   validDecimal: ["comma", "period"],
-    
+
   requiresVersion: "2.1.0", // Required version of MagicMirror
 
   start: function () {
     var self = this;
 
-    console.log("Starting module MMM-SolarEdge");
+    console.log("Starting module MMM-SunGrow");
 
     //Flag for check if module is loaded
     this.loaded = false;
@@ -89,7 +91,7 @@ Module.register("MMM-SolarEdge", {
 
   getDetailsData: function () {
     this.sendSocketNotification(
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DETAILS_DATA_REQUESTED",
+      "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_REQUESTED",
       {
         config: this.config
       }
@@ -98,7 +100,7 @@ Module.register("MMM-SolarEdge", {
 
   getCurrentPowerData: function () {
     this.sendSocketNotification(
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_CURRENTPOWER_DATA_REQUESTED",
+      "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_REQUESTED",
       {
         config: this.config
       }
@@ -107,7 +109,7 @@ Module.register("MMM-SolarEdge", {
 
   getOverviewData: function () {
     this.sendSocketNotification(
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_OVERVIEW_DATA_REQUESTED",
+      "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_REQUESTED",
       {
         config: this.config
       }
@@ -116,7 +118,7 @@ Module.register("MMM-SolarEdge", {
 
   getDayEnergyData: function () {
     this.sendSocketNotification(
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DAY_ENERGY_DATA_REQUESTED",
+      "MMM-SunGrow-NOTIFICATION_SUNGROW_DAY_ENERGY_DATA_REQUESTED",
       {
         config: this.config
       }
@@ -144,7 +146,7 @@ Module.register("MMM-SolarEdge", {
       // Static header from config
       title = this.data.header;
     } else {
-      // Header with SolarEdge Data
+      // Header with SunGrow Data
       if (this.dataNotificationDetails) {
         title =
           this.translate("TITLE") +
@@ -188,13 +190,13 @@ Module.register("MMM-SolarEdge", {
   getTemplateData: function () {
     if (this.config.apiKey === "" || this.config.siteId === "") {
       return {
-        status: "Missing configuration for MMM-SolarEdge.",
+        status: "Missing configuration for MMM-SunGrow.",
         config: this.config
       };
     }
     if (!this.loaded) {
       return {
-        status: "Loading MMM-SolarEdge...",
+        status: "Loading MMM-SunGrow...",
         config: this.config
       };
     }
@@ -210,7 +212,7 @@ Module.register("MMM-SolarEdge", {
     }
 
     return {
-      status: "Loading MMM-SolarEdge...",
+      status: "Loading MMM-SunGrow...",
       config: this.config
     };
   },
@@ -316,7 +318,7 @@ Module.register("MMM-SolarEdge", {
   },
 
   getStyles: function () {
-    return ["MMM-SolarEdge.css"];
+    return ["MMM-SunGrow.css"];
   },
 
   // Load translations files
@@ -332,7 +334,7 @@ Module.register("MMM-SolarEdge", {
   socketNotificationReceived: function (notification, payload) {
     if (
       notification ===
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_CURRENTPOWER_DATA_RECEIVED"
+      "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED"
     ) {
       // set dataNotification
       this.dataNotificationCurrentPower = payload;
@@ -341,7 +343,7 @@ Module.register("MMM-SolarEdge", {
 
     if (
       notification ===
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DETAILS_DATA_RECEIVED"
+      "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_RECEIVED"
     ) {
       // set dataNotification
       this.dataNotificationDetails = payload;
@@ -350,7 +352,7 @@ Module.register("MMM-SolarEdge", {
 
     if (
       notification ===
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_OVERVIEW_DATA_RECEIVED"
+      "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_RECEIVED"
     ) {
       // set dataNotification
       this.dataNotificationOverview = payload;
@@ -359,7 +361,7 @@ Module.register("MMM-SolarEdge", {
 
     if (
       notification ===
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DAY_ENERGY_DATA_RECEIVED"
+      "MMM-SunGrow-NOTIFICATION_SUNGROW_DAY_ENERGY_DATA_RECEIVED"
     ) {
       // set dataNotification
       this.dataNotificationDayEnergy = payload;
