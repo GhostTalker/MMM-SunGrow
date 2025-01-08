@@ -1,186 +1,175 @@
-/* Magic Mirror
- * Module: MMM-SunGrow
+/* node_helper.js
+ * MagicMirror Module: MMM-SunGrow
  *
- * By GhostTalker
- * idea and original code from Stefan Nachtrab
- * MIT Licensed.
+ * This version logs into iSolarCloud via /v1/common/login using user & password,
+ * then stores the token for subsequent requests to /v1/plant/getPlantDetail, etc.
  */
 
-var NodeHelper = require("node_helper");
-var https = require("https");
-var http = require("http");
-var fs = require("fs");
+const NodeHelper = require("node_helper");
+const fetch = require("node-fetch");
 
 module.exports = NodeHelper.create({
-  /* socketNotificationReceived(notification, payload)
-   * This method is called when a socket notification arrives.
-   *
-   * argument notification string - The identifier of the noitication.
-   * argument payload mixed - The payload of the notification.
-   */
+
+  start: function () {
+    console.log("[MMM-SunGrow] node_helper started...");
+    this.config = null;
+    this.token = null;          // We'll store the iSolarCloud token here
+    this.updateTimer = null;    // Timer for refresh loop
+  },
+
+  // Receive config from front-end (MMM-SunGrow.js)
   socketNotificationReceived: function (notification, payload) {
-    var self = this;
+    if (notification === "SUN_GROW_CONFIG") {
+      this.config = payload;
+      console.log("[MMM-SunGrow] Received config:", this.config);
 
-    if (
-      notification ===
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_CURRENTPOWER_DATA_REQUESTED"
-    ) {
-      if (payload.config.mockData) {
-        var currentPowerFlow = fs.readFileSync(
-          __dirname + "/mock/currentPowerFlowPvBattery.json"
-        );
-        self.sendSocketNotification(
-          "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_CURRENTPOWER_DATA_RECEIVED",
-          JSON.parse(currentPowerFlow)
-        );
-      } else {
-        var liveDataClient = payload.config.liveDataUrl.startsWith("https")
-          ? https
-          : http;
-        var currentPowerUrl =
-          payload.config.liveDataUrl +
-          "/solaredge-apigw/api/site/" +
-          payload.config.siteId +
-          "/currentPowerFlow.json";
-        var auth =
-          "Basic " +
-          Buffer.from(
-            payload.config.userName + ":" + payload.config.userPassword
-          ).toString("base64");
-        var options = {
-          headers: { Authorization: auth }
-        };
-        liveDataClient
-          .get(currentPowerUrl, options, (res) => {
-            res.on("data", (d) => {
-              self.sendSocketNotification(
-                "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_CURRENTPOWER_DATA_RECEIVED",
-                JSON.parse(d)
-              );
-            });
-          })
-          .on("error", (e) => {
-            console.error(e);
-          });
+      // Clear any previous timer if re-initialized
+      if (this.updateTimer) {
+        clearTimeout(this.updateTimer);
+        this.updateTimer = null;
       }
-    }
 
-    if (
-      notification ===
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DETAILS_DATA_REQUESTED"
-    ) {
-      if (payload.config.mockData) {
-        var details = fs.readFileSync(__dirname + "/mock/details.json");
-        self.sendSocketNotification(
-          "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DETAILS_DATA_RECEIVED",
-          JSON.parse(details)
-        );
-      } else {
-        var portalDataClient = payload.config.liveDataUrl.startsWith("https")
-          ? https
-          : http;
-        let detailsUrl =
-          payload.config.portalUrl +
-          "/site/" +
-          payload.config.siteId +
-          "/details?api_key=" +
-          payload.config.apiKey;
-
-        portalDataClient
-          .get(detailsUrl, (res) => {
-            res.on("data", (d) => {
-              self.sendSocketNotification(
-                "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DETAILS_DATA_RECEIVED",
-                JSON.parse(d)
-              );
-            });
-          })
-          .on("error", (e) => {
-            console.error(e);
-          });
-      }
-    }
-
-    if (
-      notification ===
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_OVERVIEW_DATA_REQUESTED"
-    ) {
-      if (payload.config.mockData) {
-        var overview = fs.readFileSync(__dirname + "/mock/overview.json");
-        self.sendSocketNotification(
-          "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_OVERVIEW_DATA_RECEIVED",
-          JSON.parse(overview)
-        );
-      } else {
-        var portalDataClient = payload.config.liveDataUrl.startsWith("https")
-          ? https
-          : http;
-        let overviewUrl =
-          payload.config.portalUrl +
-          "/site/" +
-          payload.config.siteId +
-          "/overview?api_key=" +
-          payload.config.apiKey;
-        portalDataClient
-          .get(overviewUrl, (res) => {
-            res.on("data", (d) => {
-              self.sendSocketNotification(
-                "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_OVERVIEW_DATA_RECEIVED",
-                JSON.parse(d)
-              );
-            });
-          })
-          .on("error", (e) => {
-            console.error(e);
-          });
-      }
-    }
-
-    if (
-      notification ===
-      "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DAY_ENERGY_DATA_REQUESTED"
-    ) {
-      if (payload.config.mockData) {
-        var overview = fs.readFileSync(__dirname + "/mock/dayEnergy.json");
-        self.sendSocketNotification(
-          "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DAY_ENERGY_DATA_RECEIVED",
-          JSON.parse(overview)
-        );
-      } else {
-        var portalDataClient = payload.config.liveDataUrl.startsWith("https")
-          ? https
-          : http;
-        const todayStr = self.formatDate(new Date(), "YYYY-MM-DD");
-        let overviewUrl =
-          payload.config.portalUrl +
-          "/site/" +
-          payload.config.siteId +
-          "/energyDetails?" +
-          "meters=Production,Consumption,SelfConsumption,FeedIn,Purchased" +
-          "&timeUnit=DAY" +
-          "&startTime=" + todayStr + " 00:00:00" +
-          "&endTime=" + todayStr + " 23:59:59" +
-          "&api_key=" + payload.config.apiKey;
-        portalDataClient
-          .get(overviewUrl, (res) => {
-            res.on("data", (d) => {
-              self.sendSocketNotification(
-                "MMM-SolarEdge-NOTIFICATION_SOLAREDGE_DAY_ENERGY_DATA_RECEIVED",
-                JSON.parse(d)
-              );
-            });
-          })
-          .on("error", (e) => {
-            console.error(e);
-          });
-      }
+      // Start the login->data retrieval process
+      this.loginToISolarCloud();
     }
   },
 
-  formatDate: function(date, format) {
-    let month = date.getMonth() + 1;
-    return format.replace('YYYY', date.getFullYear())
-    .replace('MM', month.toString().padStart(2, '0'))
-	  .replace('DD', date.getDate().toString().padStart(2, '0'));
+  /**
+   * 1) LOGIN step:
+   *    POST /v1/common/login
+   *    Body includes { "user": "xxx", "password": "yyy" }
+   */
+  loginToISolarCloud: async function () {
+    try {
+      // Check if user + password are in config
+      if (!this.config.user || !this.config.password) {
+        throw new Error("No user/password provided in config for iSolarCloud login.");
+      }
+
+      const loginUrl = "https://developer-api.isolarcloud.com/v1/common/login";
+      const body = {
+        user: this.config.user,
+        password: this.config.password
+      };
+
+      const res = await fetch(loginUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        throw new Error(`Login HTTP error! status: ${res.status}`);
+      }
+
+      const loginData = await res.json();
+      // Check if loginData.result_code === "1" (success)
+      if (loginData.result_code !== "1") {
+        throw new Error(`Login error: ${loginData.result_msg || "Unknown error"}`);
+      }
+
+      // Extract the token from the response
+      // Typically: loginData.result_data.token
+      this.token = loginData.result_data.token;
+      console.log("[MMM-SunGrow] Login successful, token:", this.token);
+
+      // Now that we have a token, let's fetch the plant data
+      this.getSolarData();
+    } catch (error) {
+      console.error("[MMM-SunGrow] Error in loginToISolarCloud:", error);
+      // Inform the front-end
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
+      // Retry login after some time?
+      this.scheduleNextUpdate();
+    }
+  },
+
+  /**
+   * 2) DATA step:
+   *    Example: /v1/plant/getPlantDetail
+   *    Must include the token from login, typically in the request header or body
+   */
+  getSolarData: async function () {
+    if (!this.token) {
+      console.error("[MMM-SunGrow] No token available, cannot fetch plant data.");
+      this.scheduleNextUpdate();
+      return;
+    }
+    if (!this.config.plantId) {
+      console.error("[MMM-SunGrow] No plantId set in config, cannot fetch plant data.");
+      this.scheduleNextUpdate();
+      return;
+    }
+
+    try {
+      const url = "https://developer-api.isolarcloud.com/v1/plant/getPlantDetail";
+      const body = {
+        plantId: this.config.plantId
+      };
+
+      // Often iSolarCloud requires the token either as a request header or
+      // as part of the body. The docs say "token: xxxxxx" in the header:
+      // (Check "Common Request Headers" or "Example Request" in the docs.)
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "token": this.token            // if needed in the header
+          // or "Authorization": `Bearer ${this.token}`, etc., depending on docs
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        // Possibly the token expired? We might need to re-login.
+        if (res.status === 401) {
+          console.warn("[MMM-SunGrow] Token might have expired; re-login needed.");
+          this.token = null; // Clear token
+          this.loginToISolarCloud();
+          return;
+        }
+        throw new Error(`getPlantDetail HTTP error! status: ${res.status}`);
+      }
+
+      const result = await res.json();
+
+      // Check success code
+      if (result.result_code !== "1") {
+        throw new Error(`getPlantDetail error: ${result.result_msg}`);
+      }
+
+      // Now result.result_data likely has the plant details
+      // Example fields: dailyPower, totalPower, etc.
+      // You can log or parse them:
+      // console.log("[MMM-SunGrow] Plant data:", result.result_data);
+
+      // Send data to the front-end for rendering
+      this.sendSocketNotification("SUN_GROW_DATA", result);
+
+    } catch (error) {
+      console.error("[MMM-SunGrow] Error in getSolarData:", error);
+      // Send error to front-end
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
+    } finally {
+      // Schedule next update
+      this.scheduleNextUpdate();
+    }
+  },
+
+  // Helper to schedule the next data refresh
+  scheduleNextUpdate: function () {
+    const refreshInterval = this.config.updateInterval || (10 * 60 * 1000);
+    this.updateTimer = setTimeout(() => {
+      // We already have a token or not. If we have one, call getSolarData().
+      // If it might have expired, login again. This logic is up to you.
+      if (this.token) {
+        this.getSolarData();
+      } else {
+        this.loginToISolarCloud();
+      }
+    }, refreshInterval);
   }
+
 });
