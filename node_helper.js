@@ -131,6 +131,7 @@ module.exports = NodeHelper.create({
         },
         body: JSON.stringify(body)
       });
+      console.log("[MMM-SunGrow] /openapi/login response:", loginData);
 
       if (!res.ok) {
         // Possibly the token expired? We might need to re-login.
