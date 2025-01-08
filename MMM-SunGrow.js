@@ -15,6 +15,7 @@ Module.register("MMM-SunGrow", {
     appKey: "",
     secretKey: "",
     plantId: "",
+    plantSN: "",
     appId: "",
     userName: undefined,
     userPassword: undefined,

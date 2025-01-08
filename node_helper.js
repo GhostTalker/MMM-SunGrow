@@ -111,7 +111,12 @@ module.exports = NodeHelper.create({
     try {
       const url = `${this.config.portalUrl}/openapi/getPowerStationDetail`;
       const body = {
-        plantId: this.config.plantId
+        appkey: this.config.appKey || "",
+        is_get_ps_remarks: "1" || "",
+        lang: "_en_US",
+        sys_code: "901",
+        token: this.token
+        plantId: this.config.plantSN
       };
 
       // Often iSolarCloud requires the token either as a request header or
@@ -120,8 +125,8 @@ module.exports = NodeHelper.create({
       const res = await fetch(url, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "token": this.token            // if needed in the header
+          "Content-Type": "application/json"//,
+          //"token": this.token            // if needed in the header
           // or "Authorization": `Bearer ${this.token}`, etc., depending on docs
         },
         body: JSON.stringify(body)
