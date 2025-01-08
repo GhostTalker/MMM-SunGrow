@@ -115,7 +115,7 @@ module.exports = NodeHelper.create({
         is_get_ps_remarks: "1" || "",
         lang: "_en_US",
         sys_code: "901",
-        token: this.token
+        token: this.token,
         plantId: this.config.plantSN
       };
 
