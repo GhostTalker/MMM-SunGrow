@@ -40,7 +40,8 @@ Module.register("MMM-SunGrow", {
     var self = this;
 
     console.log("Starting module MMM-SunGrow");
-
+    Log.info("[MMM-SunGrow] start() called, sending config to node_helper...");
+    this.sendSocketNotification("SUN_GROW_CONFIG", this.config);
     //Flag for check if module is loaded
     this.loaded = false;
 
