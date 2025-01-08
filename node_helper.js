@@ -51,7 +51,7 @@ module.exports = NodeHelper.create({
         appkey: this.config.appKey || "",
         user_account: this.config.userName || "",
         user_password: this.config.userPassword || "",
-        lang. "_en_US",
+        lang: "_en_US",
         sys_code: "207",
         token: ""
       };
