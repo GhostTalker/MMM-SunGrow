@@ -116,7 +116,7 @@ module.exports = NodeHelper.create({
         lang: "_en_US",
         sys_code: "901",
         token: this.token,
-        plantId: this.config.plantSN
+        ps_id: this.config.plantId
       };
 
       // Often iSolarCloud requires the token either as a request header or
