@@ -125,7 +125,7 @@ module.exports = NodeHelper.create({
         appkey: this.config.appKey || "",
         is_get_ps_remarks: "1",
         lang: "_en_US",
-        sn: this.config.sn,       // <-- this is required
+        sn: this.config.plantSN,       // <-- this is required
         sys_code: "207",          // as per your note
         token: this.token
       };
