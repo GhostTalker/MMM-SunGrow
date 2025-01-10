@@ -1,9 +1,9 @@
 /* node_helper.js
  * MagicMirror Module: MMM-SunGrow
  *
- * Updated to:
- * 1) Wait for front-end requests ("MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_REQUESTED")
- * 2) Reshape the new JSON to match the old "details" structure
+ * 1) Wait for front-end "DETAILS_DATA" request
+ * 2) Use /openapi/getPowerStationDetail with the new payload
+ * 3) Transform result_data into the old structure
  */
 
 const NodeHelper = require("node_helper");
@@ -17,7 +17,7 @@ module.exports = NodeHelper.create({
   },
 
   /**
-   * Handle incoming notifications from MMM-SunGrow.js
+   * Handle incoming notifications.
    */
   socketNotificationReceived: async function (notification, payload) {
     // 1) Initial config
@@ -25,30 +25,29 @@ module.exports = NodeHelper.create({
       this.config = payload;
       console.log("[MMM-SunGrow] Received config:", this.config);
 
-      // If we have no token yet, login. Otherwise, do nothing (we'll wait for data requests).
+      // If we have no token yet, login:
       if (!this.token) {
         await this.loginToISolarCloud();
       }
       return;
     }
 
-    // 2) Listen for the front-end's data requests
+    // 2) Listen for detail requests from front-end
     switch (notification) {
       case "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_REQUESTED":
-        // If we don't have a token or it might have expired, try re-login
         if (!this.token) {
           await this.loginToISolarCloud();
         }
         this.fetchDetailsData();
         break;
 
-      // (You could add other requests here, e.g. CURRENTPOWER, OVERVIEW, DAY_ENERGY, etc.)
+      // You could add other requests (current power, overview, etc.)
     }
   },
 
   /**
    * LOGIN step:
-   *   POST /openapi/login with user & password + x-access-key
+   *   POST /openapi/login with user, password, etc.
    */
   loginToISolarCloud: async function () {
     try {
@@ -62,7 +61,7 @@ module.exports = NodeHelper.create({
         user_account: this.config.userName,
         user_password: this.config.userPassword,
         lang: "_en_US",
-        sys_code: "901",
+        sys_code: "207", // per your note, might differ from previous "901"
         token: ""
       };
 
@@ -84,7 +83,7 @@ module.exports = NodeHelper.create({
         throw new Error(`Login error: ${loginData.result_msg || "Unknown error"}`);
       }
 
-      // Store token
+      // Save the token
       this.token = loginData.result_data.token;
       console.log("[MMM-SunGrow] /openapi/login success, token:", this.token);
 
@@ -96,9 +95,11 @@ module.exports = NodeHelper.create({
 
   /**
    * fetchDetailsData():
-   *   Called when the front-end requests "details" data.
-   *   Endpoint: /openapi/getPowerStationDetail
-   *   We transform the JSON to match "dataNotificationDetails.details" structure.
+   *   Calls /openapi/getPowerStationDetail with the new fields:
+   *   - sn (serial number)
+   *   - sys_code: 207
+   *   - is_get_ps_remarks: "1"
+   *   Then transforms result_data => old structure
    */
   fetchDetailsData: async function () {
     if (!this.token) {
@@ -108,10 +109,12 @@ module.exports = NodeHelper.create({
       });
       return;
     }
-    if (!this.config.plantId) {
-      console.warn("[MMM-SunGrow] No plantId in config!");
+
+    // We assume 'this.config.sn' contains "B22C2803603"
+    if (!this.config.sn) {
+      console.warn("[MMM-SunGrow] No sn in config!");
       this.sendSocketNotification("SUN_GROW_ERROR", {
-        message: "No plantId in config."
+        message: "No sn in config."
       });
       return;
     }
@@ -122,9 +125,9 @@ module.exports = NodeHelper.create({
         appkey: this.config.appKey || "",
         is_get_ps_remarks: "1",
         lang: "_en_US",
-        sys_code: "901",
-        token: this.token,
-        ps_id: this.config.plantId
+        sn: this.config.sn,       // <-- this is required
+        sys_code: "207",          // as per your note
+        token: this.token
       };
 
       const res = await fetch(url, {
@@ -151,43 +154,34 @@ module.exports = NodeHelper.create({
         throw new Error(`getPowerStationDetail error: ${json.result_msg}`);
       }
 
-      // We have something like:
-      // json.result_data.data_list = [ { ps_id: 473465, ps_name: "...", install_power: 27250, ... }, {...}, ... ]
-      // Find the station matching this.config.plantId
-      const dataList = json.result_data.data_list || [];
-      const matchingItem = dataList.find(
-        (item) => item.ps_id === parseInt(this.config.plantId)
-      );
+      // The new result_data is an object with fields like:
+      // {
+      //   "design_capacity": 14050,
+      //   "ps_location": "Adolphsbühlstraße 71...",
+      //   "ps_name": "Schulze_Adelsberg",
+      //   "install_date": "...",
+      //   ...
+      // }
+      const rd = json.result_data;
 
-      if (!matchingItem) {
-        console.warn("[MMM-SunGrow] No matching ps_id in data_list for plantId:", this.config.plantId);
-        // Send an empty fallback
-        this.sendSocketNotification("MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_RECEIVED", {
-          details: {
-            location: { address: "", city: "" },
-            peakPower: 0
-          }
-        });
-        return;
-      }
-
-      // Transform to old structure:
-      // old code expects: dataNotificationDetails.details.location.address
-      //                  dataNotificationDetails.details.location.city
-      //                  dataNotificationDetails.details.peakPower
+      // We'll convert 'design_capacity' (e.g. 14050) to 14.05 kW => old "peakPower".
+      // Old code: dataNotificationDetails.details.location.address
+      //           dataNotificationDetails.details.location.city
+      //           dataNotificationDetails.details.peakPower
+      // There's no separate city, so we set city: "Unknown".
       const transformed = {
         details: {
           location: {
-            address: matchingItem.ps_location || "No address",
-            // The old code used city; we only have a combined address. We'll set city to "Unknown":
+            address: rd.ps_location || "No address",
             city: "Unknown"
           },
-          // If install_power = 27250 means 27.25 kW, do /1000:
-          peakPower: (matchingItem.install_power || 0) / 1000
+          // design_capacity in watts => /1000 => kW
+          // If design_capacity=14050 => 14.05 kW
+          peakPower: (rd.design_capacity || 0) / 1000
         }
       };
 
-      // Send to front-end under the correct notification name:
+      // Send it to front-end as "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_RECEIVED"
       this.sendSocketNotification(
         "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_RECEIVED",
         transformed
