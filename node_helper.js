@@ -111,8 +111,8 @@ module.exports = NodeHelper.create({
     }
 
     // We assume 'this.config.sn' contains "B22C2803603"
-    if (!this.config.sn) {
-      console.warn("[MMM-SunGrow] No sn in config!");
+    if (!this.config.plantSN) {
+      console.warn("[MMM-SunGrow] No plantSN in config!");
       this.sendSocketNotification("SUN_GROW_ERROR", {
         message: "No sn in config."
       });
