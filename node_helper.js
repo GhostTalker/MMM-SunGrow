@@ -1,47 +1,57 @@
 /* node_helper.js
  * MagicMirror Module: MMM-SunGrow
  *
- * This version logs into iSolarCloud via /v1/common/login using user & password,
- * then stores the token for subsequent requests to /v1/plant/getPlantDetail, etc.
+ * Updated to:
+ * 1) Wait for front-end requests ("MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_REQUESTED")
+ * 2) Reshape the new JSON to match the old "details" structure
  */
 
 const NodeHelper = require("node_helper");
 const fetch = require("node-fetch");
 
 module.exports = NodeHelper.create({
-
   start: function () {
     console.log("[MMM-SunGrow] node_helper started...");
     this.config = null;
-    this.token = null;          // We'll store the iSolarCloud token here
-    this.updateTimer = null;    // Timer for refresh loop
+    this.token = null; // We'll store the iSolarCloud token here
   },
 
-  // Receive config from front-end (MMM-SunGrow.js)
-  socketNotificationReceived: function (notification, payload) {
+  /**
+   * Handle incoming notifications from MMM-SunGrow.js
+   */
+  socketNotificationReceived: async function (notification, payload) {
+    // 1) Initial config
     if (notification === "SUN_GROW_CONFIG") {
       this.config = payload;
       console.log("[MMM-SunGrow] Received config:", this.config);
 
-      // Clear any previous timer if re-initialized
-      if (this.updateTimer) {
-        clearTimeout(this.updateTimer);
-        this.updateTimer = null;
+      // If we have no token yet, login. Otherwise, do nothing (we'll wait for data requests).
+      if (!this.token) {
+        await this.loginToISolarCloud();
       }
+      return;
+    }
 
-      // Start the login->data retrieval process
-      this.loginToISolarCloud();
+    // 2) Listen for the front-end's data requests
+    switch (notification) {
+      case "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_REQUESTED":
+        // If we don't have a token or it might have expired, try re-login
+        if (!this.token) {
+          await this.loginToISolarCloud();
+        }
+        this.fetchDetailsData();
+        break;
+
+      // (You could add other requests here, e.g. CURRENTPOWER, OVERVIEW, DAY_ENERGY, etc.)
     }
   },
 
   /**
-   * 1) LOGIN step:
-   *    POST /v1/common/login
-   *    Body includes { "user": "xxx", "password": "yyy" }
+   * LOGIN step:
+   *   POST /openapi/login with user & password + x-access-key
    */
   loginToISolarCloud: async function () {
     try {
-      // Check if user + password are in config
       if (!this.config.userName || !this.config.userPassword) {
         throw new Error("No user/password provided in config for iSolarCloud login.");
       }
@@ -49,8 +59,8 @@ module.exports = NodeHelper.create({
       const loginUrl = `${this.config.portalUrl}/openapi/login`;
       const body = {
         appkey: this.config.appKey || "",
-        user_account: this.config.userName || "",
-        user_password: this.config.userPassword || "",
+        user_account: this.config.userName,
+        user_password: this.config.userPassword,
         lang: "_en_US",
         sys_code: "901",
         token: ""
@@ -70,41 +80,39 @@ module.exports = NodeHelper.create({
       }
 
       const loginData = await res.json();
-      // Check if loginData.result_code === "1" (success)
       if (loginData.result_code !== "1") {
         throw new Error(`Login error: ${loginData.result_msg || "Unknown error"}`);
       }
 
-      // Extract the token from the response
-      // Typically: loginData.result_data.token
+      // Store token
       this.token = loginData.result_data.token;
-      console.log("[MMM-SunGrow] /openapi/login response:", loginData);
+      console.log("[MMM-SunGrow] /openapi/login success, token:", this.token);
 
-      // Now that we have a token, let's fetch the plant data
-      this.getSolarData();
     } catch (error) {
       console.error("[MMM-SunGrow] Error in loginToISolarCloud:", error);
-      // Inform the front-end
       this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
-      // Retry login after some time?
-      this.scheduleNextUpdate();
     }
   },
 
   /**
-   * 2) DATA step:
-   *    Example: /v1/plant/getPlantDetail
-   *    Must include the token from login, typically in the request header or body
+   * fetchDetailsData():
+   *   Called when the front-end requests "details" data.
+   *   Endpoint: /openapi/getPowerStationDetail
+   *   We transform the JSON to match "dataNotificationDetails.details" structure.
    */
-  getSolarData: async function () {
+  fetchDetailsData: async function () {
     if (!this.token) {
-      console.error("[MMM-SunGrow] No token available, cannot fetch plant data.");
-      this.scheduleNextUpdate();
+      console.warn("[MMM-SunGrow] No token, cannot fetch details data!");
+      this.sendSocketNotification("SUN_GROW_ERROR", {
+        message: "No token available."
+      });
       return;
     }
     if (!this.config.plantId) {
-      console.error("[MMM-SunGrow] No plantId set in config, cannot fetch plant data.");
-      this.scheduleNextUpdate();
+      console.warn("[MMM-SunGrow] No plantId in config!");
+      this.sendSocketNotification("SUN_GROW_ERROR", {
+        message: "No plantId in config."
+      });
       return;
     }
 
@@ -112,75 +120,82 @@ module.exports = NodeHelper.create({
       const url = `${this.config.portalUrl}/openapi/getPowerStationDetail`;
       const body = {
         appkey: this.config.appKey || "",
-        is_get_ps_remarks: "1" || "",
+        is_get_ps_remarks: "1",
         lang: "_en_US",
         sys_code: "901",
         token: this.token,
         ps_id: this.config.plantId
       };
 
-      // Often iSolarCloud requires the token either as a request header or
-      // as part of the body. The docs say "token: xxxxxx" in the header:
-      // (Check "Common Request Headers" or "Example Request" in the docs.)
       const res = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-access-key": this.config.secretKey || ""
-          // or "Authorization": `Bearer ${this.token}`, etc., depending on docs
         },
         body: JSON.stringify(body)
       });
 
       if (!res.ok) {
-        // Possibly the token expired? We might need to re-login.
         if (res.status === 401) {
-          console.warn("[MMM-SunGrow] Token might have expired; re-login needed.");
-          this.token = null; // Clear token
-          this.loginToISolarCloud();
+          console.warn("[MMM-SunGrow] Token might have expired. Re-login needed.");
+          this.token = null;
+          await this.loginToISolarCloud();
           return;
         }
-        throw new Error(`getPlantDetail HTTP error! status: ${res.status}`);
+        throw new Error(`HTTP error! status: ${res.status}`);
       }
 
-      const result = await res.json();
-      console.log("[MMM-SunGrow] /openapi/getPowerStationDetail:", result);
-
-      // Check success code
-      if (result.result_code !== "1") {
-        throw new Error(`getPlantDetail error: ${result.result_msg}`);
+      const json = await res.json();
+      if (json.result_code !== "1") {
+        throw new Error(`getPowerStationDetail error: ${json.result_msg}`);
       }
 
-      // Now result.result_data likely has the plant details
-      // Example fields: dailyPower, totalPower, etc.
-      // You can log or parse them:
-      // console.log("[MMM-SunGrow] Plant data:", result.result_data);
+      // We have something like:
+      // json.result_data.data_list = [ { ps_id: 473465, ps_name: "...", install_power: 27250, ... }, {...}, ... ]
+      // Find the station matching this.config.plantId
+      const dataList = json.result_data.data_list || [];
+      const matchingItem = dataList.find(
+        (item) => item.ps_id === parseInt(this.config.plantId)
+      );
 
-      // Send data to the front-end for rendering
-      this.sendSocketNotification("SUN_GROW_DATA", result);
+      if (!matchingItem) {
+        console.warn("[MMM-SunGrow] No matching ps_id in data_list for plantId:", this.config.plantId);
+        // Send an empty fallback
+        this.sendSocketNotification("MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_RECEIVED", {
+          details: {
+            location: { address: "", city: "" },
+            peakPower: 0
+          }
+        });
+        return;
+      }
+
+      // Transform to old structure:
+      // old code expects: dataNotificationDetails.details.location.address
+      //                  dataNotificationDetails.details.location.city
+      //                  dataNotificationDetails.details.peakPower
+      const transformed = {
+        details: {
+          location: {
+            address: matchingItem.ps_location || "No address",
+            // The old code used city; we only have a combined address. We'll set city to "Unknown":
+            city: "Unknown"
+          },
+          // If install_power = 27250 means 27.25 kW, do /1000:
+          peakPower: (matchingItem.install_power || 0) / 1000
+        }
+      };
+
+      // Send to front-end under the correct notification name:
+      this.sendSocketNotification(
+        "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_RECEIVED",
+        transformed
+      );
 
     } catch (error) {
-      console.error("[MMM-SunGrow] Error in getSolarData:", error);
-      // Send error to front-end
+      console.error("[MMM-SunGrow] fetchDetailsData error:", error);
       this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
-    } finally {
-      // Schedule next update
-      this.scheduleNextUpdate();
     }
-  },
-
-  // Helper to schedule the next data refresh
-  scheduleNextUpdate: function () {
-    const refreshInterval = this.config.updateInterval || (10 * 60 * 1000);
-    this.updateTimer = setTimeout(() => {
-      // We already have a token or not. If we have one, call getSolarData().
-      // If it might have expired, login again. This logic is up to you.
-      if (this.token) {
-        this.getSolarData();
-      } else {
-        this.loginToISolarCloud();
-      }
-    }, refreshInterval);
   }
-
 });
