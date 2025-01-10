@@ -154,8 +154,6 @@ Module.register("MMM-SunGrow", {
           this.translate("TITLE") +
           " - " +
           this.dataNotificationDetails.details.location.address +
-          ", " +
-          this.dataNotificationDetails.details.location.city +
           " - " +
           this.getDecimalAdjustedValue(this.dataNotificationDetails.details.peakPower) +
           " KWP";
