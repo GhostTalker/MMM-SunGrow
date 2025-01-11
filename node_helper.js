@@ -320,11 +320,11 @@ module.exports = NodeHelper.create({
       // If chargingPower > 0 => from PV to STORAGE
       if (batteryChargingPower > 0) {
         connections.push({ from: "PV", to: "STORAGE" });
-        devStoragePowerW = batteryChargingPower;
+        batteryPowerW = batteryChargingPower;
       // Else if dischargingPower > 0 => from STORAGE to LOAD
       } else if (batteryDischargingPower > 0) {
         connections.push({ from: "STORAGE", to: "LOAD" });
-        devStoragePowerW = batteryDischargingPower;
+        batteryPowerW = batteryDischargingPower;
       // Else both 0 => no arrow, currentPower=0
       }
 
