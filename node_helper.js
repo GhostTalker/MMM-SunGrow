@@ -246,7 +246,7 @@ module.exports = NodeHelper.create({
         device_type: "14",
         lang: "_en_US",
         point_id_list: ["13126", "13150", "13141", "13119"], // SoC, status, voltage, current
-        ps_key_list: [ '${this.config.plantId}_14_1_1' ],  // or from config
+        ps_key_list: [ "5326778_14_1_1" ],  // or from config
         sys_code: "207",
         token: this.token
       };
