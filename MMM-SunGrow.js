@@ -12,7 +12,7 @@
 Module.register("MMM-SunGrow", {
   defaults: {
     retryDelay: 5000,
-    updateInterval: 1 * 10 * 1000, //every 10 sec
+    updateInterval: 10 * 1000, //every 10 sec
     appKey: "",
     secretKey: "",
     plantId: "",

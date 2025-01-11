@@ -147,7 +147,7 @@ module.exports = NodeHelper.create({
       this.token = loginData.result_data.token;
       //DEGBUG
       //console.log("[MMM-SunGrow] /openapi/login success, token:", this.token);
-      console.log("[MMM-SunGrow] /openapi/login success";
+      console.log("[MMM-SunGrow] /openapi/login success");
 
     } catch (error) {
       console.error("[MMM-SunGrow] Error in loginToISolarCloud:", error);
