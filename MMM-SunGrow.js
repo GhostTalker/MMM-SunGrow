@@ -161,7 +161,7 @@ Module.register("MMM-SunGrow", {
         title = this.translate("TITLE");
       }
     }
-    return title;
+    return title + "<br>";
   },
 
   getTemplate: function () {
