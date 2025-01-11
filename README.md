@@ -110,7 +110,7 @@ It is a rework of the Module [MMM-SolarEdge](https://github.com/st3v0rr/MMM-Sola
 [2025-01-11 17:55:01.888] [LOG]   [MMM-SunGrow] fetchDayEnergyData() - calling getDeviceRealTimeData for daily stats
 ``````
 
-## Example log output on MagicMirror²
+## Example output on MagicMirror²
 
 ![PV](docs/SunGrowPvBattery.png)
 
