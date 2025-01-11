@@ -298,7 +298,7 @@ module.exports = NodeHelper.create({
           devStorageStatus = "Idle";
           break;
         default:
-          statusText = `Unknown(${statusCode})`;
+          devStorageStatus = `Unknown(${statusCode})`;
       }
 
       const connections = [];
