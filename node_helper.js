@@ -1,39 +1,43 @@
 /* node_helper.js
  * MagicMirror Module: MMM-SunGrow
  *
- * 1) Wait for front-end "DETAILS_DATA" request
- * 2) Use /openapi/getPowerStationDetail with the new payload
- * 3) Transform result_data into the old structure
+ * This node_helper:
+ * 1) Logs into iSolarCloud on demand
+ * 2) Handles requests for:
+ *    - DETAILS   (fetchDetailsData)
+ *    - CURRENT POWER/BATTERY (fetchStorageData)
+ *    - OVERVIEW (fetchOverviewData) - placeholder
+ *    - DAY ENERGY (fetchDayEnergyData) - placeholder
  */
 
 const NodeHelper = require("node_helper");
 const fetch = require("node-fetch");
 
 module.exports = NodeHelper.create({
+
+  // 1) Initialize
   start: function () {
     console.log("[MMM-SunGrow] node_helper started...");
     this.config = null;
     this.token = null; // We'll store the iSolarCloud token here
   },
 
-  /**
-   * Handle incoming notifications.
-   */
+  // 2) Handle incoming notifications from MMM-SunGrow.js
   socketNotificationReceived: async function (notification, payload) {
-    // 1) Initial config
     if (notification === "SUN_GROW_CONFIG") {
       this.config = payload;
       console.log("[MMM-SunGrow] Received config:", this.config);
 
-      // If we have no token yet, login:
+      // If we have no token yet, do an initial login
       if (!this.token) {
         await this.loginToISolarCloud();
       }
       return;
     }
 
-    // 2) Listen for detail requests from front-end
+    // Listen for data requests from the front-end
     switch (notification) {
+
       case "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_REQUESTED":
         if (!this.token) {
           await this.loginToISolarCloud();
@@ -41,14 +45,30 @@ module.exports = NodeHelper.create({
         this.fetchDetailsData();
         break;
 
-      // You could add other requests (current power, overview, etc.)
+      case "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_REQUESTED":
+        if (!this.token) {
+          await this.loginToISolarCloud();
+        }
+        this.fetchStorageData();
+        break;
+
+      case "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_REQUESTED":
+        if (!this.token) {
+          await this.loginToISolarCloud();
+        }
+        this.fetchOverviewData(); // placeholder below
+        break;
+
+      case "MMM-SunGrow-NOTIFICATION_SUNGROW_DAY_ENERGY_DATA_REQUESTED":
+        if (!this.token) {
+          await this.loginToISolarCloud();
+        }
+        this.fetchDayEnergyData(); // placeholder below
+        break;
     }
   },
 
-  /**
-   * LOGIN step:
-   *   POST /openapi/login with user, password, etc.
-   */
+  // 3) Login method for iSolarCloud
   loginToISolarCloud: async function () {
     try {
       if (!this.config.userName || !this.config.userPassword) {
@@ -61,7 +81,7 @@ module.exports = NodeHelper.create({
         user_account: this.config.userName,
         user_password: this.config.userPassword,
         lang: "_en_US",
-        sys_code: "207", // per your note, might differ from previous "901"
+        sys_code: "207", // or "901" depending on your environment
         token: ""
       };
 
@@ -83,7 +103,6 @@ module.exports = NodeHelper.create({
         throw new Error(`Login error: ${loginData.result_msg || "Unknown error"}`);
       }
 
-      // Save the token
       this.token = loginData.result_data.token;
       console.log("[MMM-SunGrow] /openapi/login success, token:", this.token);
 
@@ -93,29 +112,16 @@ module.exports = NodeHelper.create({
     }
   },
 
-  /**
-   * fetchDetailsData():
-   *   Calls /openapi/getPowerStationDetail with the new fields:
-   *   - sn (serial number)
-   *   - sys_code: 207
-   *   - is_get_ps_remarks: "1"
-   *   Then transforms result_data => old structure
-   */
+  // 4) DETAILS (Plant Info) - /openapi/getPowerStationDetail
   fetchDetailsData: async function () {
     if (!this.token) {
       console.warn("[MMM-SunGrow] No token, cannot fetch details data!");
-      this.sendSocketNotification("SUN_GROW_ERROR", {
-        message: "No token available."
-      });
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
       return;
     }
-
-    // We assume 'this.config.sn' contains "B22C2803603"
     if (!this.config.plantSN) {
       console.warn("[MMM-SunGrow] No plantSN in config!");
-      this.sendSocketNotification("SUN_GROW_ERROR", {
-        message: "No sn in config."
-      });
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: "No sn in config." });
       return;
     }
 
@@ -125,8 +131,8 @@ module.exports = NodeHelper.create({
         appkey: this.config.appKey || "",
         is_get_ps_remarks: "1",
         lang: "_en_US",
-        sn: this.config.plantSN,       // <-- this is required
-        sys_code: "207",          // as per your note
+        sn: this.config.plantSN, // e.g. "B22C2803603"
+        sys_code: "207",
         token: this.token
       };
 
@@ -154,24 +160,17 @@ module.exports = NodeHelper.create({
         throw new Error(`getPowerStationDetail error: ${json.result_msg}`);
       }
 
+      // Transform the result to old "details" structure
       const rd = json.result_data;
-
-      // We'll convert 'design_capacity' (e.g. 14050) to 14.05 kW => old "peakPower".
-      // Old code: dataNotificationDetails.details.location.address
-      //           dataNotificationDetails.details.location.city
-      //           dataNotificationDetails.details.peakPower
       const transformed = {
         details: {
           location: {
             address: rd.ps_location || "No address"
           },
-          // design_capacity in watts => /1000 => kW
-          // If design_capacity=14050 => 14.05 kW
           peakPower: (rd.design_capacity || 0) / 1000
         }
       };
 
-      // Send it to front-end as "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_RECEIVED"
       this.sendSocketNotification(
         "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_RECEIVED",
         transformed
@@ -182,120 +181,187 @@ module.exports = NodeHelper.create({
       this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
     }
   },
-   async fetchStorageData() {
-     if (!this.token) {
-       console.warn("[MMM-SunGrow] No token. Re-login or abort.");
-       this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token for battery data." });
-       return;
-     }
 
-     try {
-       const url = `${this.config.portalUrl}/openapi/getBatteryMeasuringPoints`;
+  // 5) CURRENT POWER (Battery/Storage Info) - /openapi/getBatteryMeasuringPoints
+  fetchStorageData: async function () {
+    if (!this.token) {
+      console.warn("[MMM-SunGrow] No token, cannot fetch storage data!");
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
+      return;
+    }
 
-       const body = {
-         appkey: this.config.appKey || "",
-         device_type: "43",
-         lang: "_en_US",
-         point_id_list: ["58604", "58608", "58601", "58602"],
-         ps_key_list: [ "5326778_43_2_1" ],  // or from your config
-         sys_code: "207",
-         token: this.token
-       };
+    try {
+      const url = `${this.config.portalUrl}/openapi/getBatteryMeasuringPoints`;
+      const body = {
+        appkey: this.config.appKey || "",
+        device_type: "43",
+        lang: "_en_US",
+        point_id_list: ["58604", "58608", "58601", "58602"],
+        ps_key_list: [ "5326778_43_2_1" ],  // or read from config
+        sys_code: "207",
+        token: this.token
+      };
 
-       const res = await fetch(url, {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-           "x-access-key": this.config.secretKey || ""
-         },
-         body: JSON.stringify(body)
-       });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-key": this.config.secretKey || ""
+        },
+        body: JSON.stringify(body)
+      });
 
-       if (!res.ok) {
-         if (res.status === 401) {
-           console.warn("[MMM-SunGrow] Battery request got 401 => token expired?");
-           this.token = null;
-           await this.loginToISolarCloud();
-           return;
-         }
-         throw new Error(`Battery data HTTP error! status: ${res.status}`);
-       }
+      if (!res.ok) {
+        if (res.status === 401) {
+          console.warn("[MMM-SunGrow] Storage request 401 => token expired?");
+          this.token = null;
+          await this.loginToISolarCloud();
+          return;
+        }
+        throw new Error(`Battery data HTTP error! status: ${res.status}`);
+      }
 
-       const json = await res.json();
-       if (json.result_code !== "1") {
-         throw new Error(`Battery data error: ${json.result_msg}`);
-       }
+      const json = await res.json();
+      if (json.result_code !== "1") {
+        throw new Error(`Battery data error: ${json.result_msg}`);
+      }
 
-       // device_point includes p58604=SoC fraction, p58608=status code, p58601=voltage, p58602=amperage
-       const dp = json.result_data.device_point_list?.[0]?.device_point;
-       if (!dp) {
-         console.warn("[MMM-SunGrow] No device_point in battery response");
-         return;
-       }
+      // device_point includes p58604 (SoC fraction), p58608 (status code), p58601 (voltage), p58602 (amp)
+      const dp = json.result_data.device_point_list?.[0]?.device_point;
+      if (!dp) {
+        console.warn("[MMM-SunGrow] No device_point in battery response");
+        return;
+      }
 
-       // Convert strings to floats
-       const socFraction = parseFloat(dp.p58604) || 0;  // e.g. "0.448" => 0.448
-       const voltage = parseFloat(dp.p58601) || 0;      // e.g. 260.9
-       const current = parseFloat(dp.p58602) || 0;      // e.g. 1.9
-       const statusCode = dp.p58608 || "0";             // e.g. "2"
+      // Convert string fields to floats or handle as needed
+      const socFraction = parseFloat(dp.p58604) || 0;
+      const voltage = parseFloat(dp.p58601) || 0;
+      const current = parseFloat(dp.p58602) || 0;
+      const statusCode = dp.p58608 || "0";
 
-       // Map numeric codes to text
-       let statusText;
-       // We'll also define connections as an array of {from, to} objects
-       const connections = [];
-       switch (statusCode) {
-         case "1":
-           statusText = "Charging";
-           // If the battery is charging, let's say "LOAD" -> "STORAGE"
-           // so the front-end gets "load_storage"
-           connections.push({ from: "LOAD", to: "STORAGE" });
-           break;
-         case "2":
-           statusText = "Discharging";
-           // If the battery is discharging, "STORAGE" -> "LOAD"
-           // => "storage_load"
-           connections.push({ from: "STORAGE", to: "LOAD" });
-           break;
-         case "0":
-           statusText = "Idle";
-           // No arrow for idle
-           break;
-         default:
-           statusText = `Unknown(${statusCode})`;
-           // Also no arrow
-       }
+      let statusText;
+      const connections = [];
 
-       // Approximate power in watts
-       const powerW = voltage * current;
+      // 1 = Charging, 2 = Discharging, 0 = Idle
+      switch (statusCode) {
+        case "1":
+          statusText = "Charging";
+          connections.push({ from: "LOAD", to: "STORAGE" });
+          break;
+        case "2":
+          statusText = "Discharging";
+          connections.push({ from: "STORAGE", to: "LOAD" });
+          break;
+        case "0":
+          statusText = "Idle";
+          break;
+        default:
+          statusText = `Unknown(${statusCode})`;
+      }
 
-       // Build old structure
-       const transformed = {
-         siteCurrentPowerFlow: {
-           STORAGE: {
-             currentPower: powerW,             // e.g. 495.71
-             status: statusText,               // "Charging", "Discharging", "Idle", ...
-             chargeLevel: socFraction * 100    // e.g. 44.8
-           },
-           // Provide placeholders for other sub-objects if you want
-           PV:   { currentPower: 0, status: "Unknown" },
-           LOAD: { currentPower: 0, status: "Unknown" },
-           GRID: { currentPower: 0, status: "Unknown" },
-           // Insert our arrow logic here
-           connections: connections,
-           unit: "W"
-         }
-       };
-       console.log("[MMM-SunGrow] Received data:", transformed)
-       // Send to the front-end
-       this.sendSocketNotification(
-         "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED",
-         transformed
-       );
-     } catch (error) {
-       console.error("[MMM-SunGrow] fetchStorageData error:", error);
-       this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
-     }
-   }
+      // Approx power in watts
+      const powerW = voltage * current;
 
+      // Build old structure
+      const transformed = {
+        siteCurrentPowerFlow: {
+          STORAGE: {
+            currentPower: powerW,
+            status: statusText,
+            chargeLevel: socFraction * 100
+          },
+          PV:   { currentPower: 0, status: "Unknown" },
+          LOAD: { currentPower: 0, status: "Unknown" },
+          GRID: { currentPower: 0, status: "Unknown" },
+          connections: connections,
+          unit: "W"
+        }
+      };
+
+      console.log("[MMM-SunGrow] Storage data:", transformed);
+
+      this.sendSocketNotification(
+        "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED",
+        transformed
+      );
+
+    } catch (error) {
+      console.error("[MMM-SunGrow] fetchStorageData error:", error);
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
+    }
+  },
+
+  // 6) Overview (Placeholder Example)
+  fetchOverviewData: async function () {
+    if (!this.token) {
+      console.warn("[MMM-SunGrow] No token for overview!");
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
+      return;
+    }
+
+    try {
+      // 1) Call your iSolarCloud endpoint for overview
+      //    e.g., `${this.config.portalUrl}/openapi/getOverviewData`
+      //    We'll do a placeholder:
+      console.log("[MMM-SunGrow] fetchOverviewData() called - placeholder");
+
+      // For example:
+      const result = {
+        overview: {
+          // fill with data from the real endpoint
+          lastDayData: { energy: 5000 },   // e.g. 5,000 Wh => 5 kWh
+          lastMonthData: { energy: 30000 }, // 30 kWh
+          lastYearData: { energy: 200000 }  // 200 kWh
+        }
+      };
+
+      // Transform or just pass it as-is:
+      // The old code expects dataNotificationOverview.overview in the front-end
+      this.sendSocketNotification(
+        "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_RECEIVED",
+        result
+      );
+
+    } catch (error) {
+      console.error("[MMM-SunGrow] fetchOverviewData error:", error);
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
+    }
+  },
+
+  // 7) Day Energy (Placeholder Example)
+  fetchDayEnergyData: async function () {
+    if (!this.token) {
+      console.warn("[MMM-SunGrow] No token for day energy!");
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
+      return;
+    }
+
+    try {
+      // 1) Call your iSolarCloud endpoint for day energy
+      console.log("[MMM-SunGrow] fetchDayEnergyData() called - placeholder");
+
+      // Example placeholder:
+      const result = {
+        energyDetails: {
+          meters: [
+            { type: "Production", values: [{ value: 4000 }] },     // 4,000 Wh => 4 kWh
+            { type: "Consumption", values: [{ value: 2000 }] },   // 2,000 Wh => 2 kWh
+            { type: "FeedIn", values: [{ value: 1000 }] },        // 1,000 Wh
+            { type: "Purchased", values: [{ value: 500 }] },      // 500 Wh
+            { type: "SelfConsumption", values: [{ value: 1500 }] }// 1,500 Wh
+          ]
+        }
+      };
+
+      this.sendSocketNotification(
+        "MMM-SunGrow-NOTIFICATION_SUNGROW_DAY_ENERGY_DATA_RECEIVED",
+        result
+      );
+
+    } catch (error) {
+      console.error("[MMM-SunGrow] fetchDayEnergyData error:", error);
+      this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
+    }
+  }
 
 });
