@@ -11,7 +11,7 @@
 Module.register("MMM-SunGrow", {
   defaults: {
     retryDelay: 5000,
-    updateInterval: 5 * 60 * 1000,
+    updateInterval: 1000, //every 15 minutes 1000 * 60 * 15
     appKey: "",
     secretKey: "",
     plantId: "",
@@ -19,7 +19,7 @@ Module.register("MMM-SunGrow", {
     appId: "",
     userName: undefined,
     userPassword: undefined,
-    updateIntervalBasicData: 1000 , //every 15 minutes 1000 * 60 * 15
+    updateIntervalBasicData: 1000 * 60 * 15, //every 15 minutes 1000 * 60 * 15
     portalUrl: "https://gateway.isolarcloud.eu",
     showOverview: true,
     showDayEnergy: true,
