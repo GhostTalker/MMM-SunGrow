@@ -315,7 +315,7 @@ module.exports = NodeHelper.create({
 
       // Build arrow connections & currentPower
       const connections = [];
-      let devStoragePowerW = 0;
+      let batteryPowerW = 0;
 
       // If chargingPower > 0 => from PV to STORAGE
       if (batteryChargingPower > 0) {
