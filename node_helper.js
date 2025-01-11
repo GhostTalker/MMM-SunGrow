@@ -243,6 +243,8 @@ module.exports = NodeHelper.create({
     }
 
     try {
+        console.log("[MMM-SunGrow] fetchCurrentPowerData() - calling fetchCurrentPowerData for live stats");
+
         const url = `${this.config.portalUrl}/openapi/getDeviceRealTimeData`;
 
         // We request measuring points for:
@@ -479,8 +481,6 @@ module.exports = NodeHelper.create({
           ]
         }
       };
-
-      console.log("[MMM-SunGrow] Day energy data:", transformed);
 
       // 5) Send to the front-end
       this.sendSocketNotification(
