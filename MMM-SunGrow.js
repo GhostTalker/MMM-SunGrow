@@ -19,7 +19,7 @@ Module.register("MMM-SunGrow", {
     appId: "",
     userName: undefined,
     userPassword: undefined,
-    updateIntervalBasicData: 1000 * 60 * 15, //every 15 minutes
+    updateIntervalBasicData: 1000 , //every 15 minutes 1000 * 60 * 15
     portalUrl: "https://gateway.isolarcloud.eu",
     showOverview: true,
     showDayEnergy: true,
