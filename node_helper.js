@@ -285,7 +285,7 @@ module.exports = NodeHelper.create({
       const batteryDischargingPower = parseFloat(dp.p13150) || 0; // Battery Discharging
       const devStorageChargeLevel = parseFloat(dp.p13141) || 0;   // Battery Charge Level
       const devLoadPowerW = parseFloat(dp.p13119) || 0;   // actual LOAD power
-      const devPvPower"" = parseFloat(dp.p13011) || 0;   // actual PV power
+      const devPvPower = parseFloat(dp.p13011) || 0;   // actual PV power
 
 
       // Build arrow connections & currentPower
@@ -303,6 +303,9 @@ module.exports = NodeHelper.create({
       // Else both 0 => no arrow, currentPower=0
       }
 
+      if (devPvPower > 0) {
+        connections.push({ from: "PV", to: "LOAD" });
+      }
 
       // Now build the final data structure
       const transformed = {
