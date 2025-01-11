@@ -371,10 +371,27 @@ module.exports = NodeHelper.create({
     }
   },
 
-  /**
+   /**
    * fetchDayEnergyData():
-   * Another placeholder for daily energy endpoint. Convert the
-   * JSON to the old structure e.g. `dataNotificationDayEnergy.energyDetails`.
+   * Calls /openapi/getDeviceRealTimeData with the measuring points for daily data:
+   *  - 13112 = daily PV Production (Wh)
+   *  - 13199 = daily Load Consumption (Wh)
+   *  - 13122 = daily Feed-In (Wh)
+   *  - 13147 = daily Purchased (Wh)
+   *  - 13116 = daily Direct Energy Consumption / self-consumption (Wh)
+   *
+   * Then transforms to:
+   *  {
+   *    energyDetails: {
+   *      meters: [
+   *        { type: "Production",   values: [{ value: ... }] },
+   *        { type: "Consumption",  values: [{ value: ... }] },
+   *        { type: "FeedIn",       values: [{ value: ... }] },
+   *        { type: "Purchased",    values: [{ value: ... }] },
+   *        { type: "SelfConsumption", values: [{ value: ... }] }
+   *      ]
+   *    }
+   *  }
    */
   fetchDayEnergyData: async function () {
     if (!this.token) {
@@ -382,25 +399,89 @@ module.exports = NodeHelper.create({
       this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
       return;
     }
-    console.log("[MMM-SunGrow] fetchDayEnergyData() called - placeholder");
 
     try {
-      // e.g. call "/openapi/getDayEnergy"
-      // For now, dummy data:
-      const result = {
+      console.log("[MMM-SunGrow] fetchDayEnergyData() - calling getDeviceRealTimeData for daily stats");
+
+      // 1) We call /openapi/getDeviceRealTimeData with the measuring points needed:
+      //    - 13112 = daily PV Production (Wh)
+      //    - 13199 = daily Load Consumption (Wh)
+      //    - 13122 = daily Feed-In Energy Today (Wh)
+      //    - 13147 = daily Purchased Energy Today (Wh)
+      //    - 13116 = daily Direct Energy Consumption (aka self consumption) (Wh)
+      const url = `${this.config.portalUrl}/openapi/getDeviceRealTimeData`;
+      const body = {
+        appkey: this.config.appKey || "",
+        device_type: "14",
+        lang: "_en_US",
+        point_id_list: [
+          "13112", // daily PV Production
+          "13199", // daily Load Consumption
+          "13122", // daily Feed-In
+          "13147", // daily Purchased
+          "13116"  // daily Self Consumption
+        ],
+        ps_key_list: [ `${this.config.plantId}_14_1_1` ],
+        sys_code: "207",
+        token: this.token
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-key": this.config.secretKey || ""
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          console.warn("[MMM-SunGrow] Day energy request got 401 => token expired?");
+          this.token = null;
+          return;
+        }
+        throw new Error(`DayEnergy HTTP error! status: ${res.status}`);
+      }
+
+      const json = await res.json();
+      if (json.result_code !== "1") {
+        throw new Error(`DayEnergy data error: ${json.result_msg}`);
+      }
+
+      // 2) Extract the device_point
+      const dp = json.result_data.device_point_list?.[0]?.device_point;
+      if (!dp) {
+        console.warn("[MMM-SunGrow] No device_point in day energy response");
+        return;
+      }
+
+      // 3) Convert the measuring points to floats, defaulting to 0 if missing
+      const dailyProductionWh = parseFloat(dp.p13112) || 0;  // daily PV Production
+      const dailyConsumptionWh = parseFloat(dp.p13199) || 0; // daily Load Consumption
+      const dailyFeedInWh = parseFloat(dp.p13122) || 0;      // daily Feed-in
+      const dailyPurchasedWh = parseFloat(dp.p13147) || 0;   // daily Purchased
+      const dailySelfConsWh = parseFloat(dp.p13116) || 0;    // daily direct self-consumption
+
+      // 4) Transform to the old structure:
+      const transformed = {
         energyDetails: {
           meters: [
-            { type: "Production", values: [{ value: 4000 }] },
-            { type: "Consumption", values: [{ value: 2000 }] },
-            { type: "FeedIn", values: [{ value: 1000 }] },
-            { type: "Purchased", values: [{ value: 500 }] },
-            { type: "SelfConsumption", values: [{ value: 1500 }] }
+            { type: "Production",      values: [{ value: dailyProductionWh }] },
+            { type: "Consumption",     values: [{ value: dailyConsumptionWh }] },
+            { type: "FeedIn",          values: [{ value: dailyFeedInWh }] },
+            { type: "Purchased",       values: [{ value: dailyPurchasedWh }] },
+            { type: "SelfConsumption", values: [{ value: dailySelfConsWh }] }
           ]
         }
       };
+
+      console.log("[MMM-SunGrow] Day energy data:", transformed);
+
+      // 5) Send to the front-end
       this.sendSocketNotification(
         "MMM-SunGrow-NOTIFICATION_SUNGROW_DAY_ENERGY_DATA_RECEIVED",
-        result
+        transformed
       );
 
     } catch (error) {
