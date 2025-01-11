@@ -101,15 +101,14 @@ It is a rework of the Module [MMM-SolarEdge](https://github.com/st3v0rr/MMM-Sola
 
 ## Example log output
 ````
-[2025-01-11 17:17:06.619] [LOG]   [MMM-SunGrow] Received config successfully
-[2025-01-11 17:17:06.619] [LOG]   [MMM-SunGrow] Waiting for ongoing login to finish...
-[2025-01-11 17:17:06.631] [INFO]  Checking git for module: MMM-SunGrow
-[2025-01-11 17:17:07.026] [LOG]   [MMM-SunGrow] /openapi/login success
-[2025-01-11 17:17:07.131] [LOG]   [MMM-SunGrow] fetchDayEnergyData() - calling getDeviceRealTimeData for daily stats
+[2025-01-11 17:54:32.340] [LOG]   Module helper loaded: MMM-SunGrow
+[2025-01-11 17:54:37.688] [LOG]   Connecting socket for: MMM-SunGrow
+[2025-01-11 17:54:52.930] [LOG]   [MMM-SunGrow] Received config successfully
+[2025-01-11 17:54:52.964] [LOG]   [MMM-SunGrow] Waiting for ongoing login to finish...
+[2025-01-11 17:54:53.457] [LOG]   [MMM-SunGrow] /openapi/login success
+[2025-01-11 17:54:53.463] [LOG]   [MMM-SunGrow] fetchCurrentPowerData() - calling fetchCurrentPowerData for live stats
+[2025-01-11 17:55:01.888] [LOG]   [MMM-SunGrow] fetchDayEnergyData() - calling getDeviceRealTimeData for daily stats
 ``````
-
-
-
 
 ---
 
