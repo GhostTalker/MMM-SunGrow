@@ -181,122 +181,122 @@ module.exports = NodeHelper.create({
       console.error("[MMM-SunGrow] fetchDetailsData error:", error);
       this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
     }
-  }
-}),
-async fetchStorageData() {
-  if (!this.token) {
-    console.warn("[MMM-SunGrow] No token. Re-login or abort.");
-    this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token for battery data." });
-    return;
-  }
+  },
+   async fetchStorageData() {
+     if (!this.token) {
+       console.warn("[MMM-SunGrow] No token. Re-login or abort.");
+       this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token for battery data." });
+       return;
+     }
 
-  try {
-    const url = `${this.config.portalUrl}/openapi/getBatteryMeasuringPoints`;
+     try {
+       const url = `${this.config.portalUrl}/openapi/getBatteryMeasuringPoints`;
 
-    const body = {
-      appkey: this.config.appKey || "",
-      device_type: "43",
-      lang: "_en_US",
-      point_id_list: ["58604", "58608", "58601", "58602"],
-      ps_key_list: [ "5326778_43_2_1" ],  // or from your config
-      sys_code: "207",
-      token: this.token
-    };
+       const body = {
+         appkey: this.config.appKey || "",
+         device_type: "43",
+         lang: "_en_US",
+         point_id_list: ["58604", "58608", "58601", "58602"],
+         ps_key_list: [ "5326778_43_2_1" ],  // or from your config
+         sys_code: "207",
+         token: this.token
+       };
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-access-key": this.config.secretKey || ""
-      },
-      body: JSON.stringify(body)
-    });
+       const res = await fetch(url, {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+           "x-access-key": this.config.secretKey || ""
+         },
+         body: JSON.stringify(body)
+       });
 
-    if (!res.ok) {
-      if (res.status === 401) {
-        console.warn("[MMM-SunGrow] Battery request got 401 => token expired?");
-        this.token = null;
-        await this.loginToISolarCloud();
-        return;
-      }
-      throw new Error(`Battery data HTTP error! status: ${res.status}`);
-    }
+       if (!res.ok) {
+         if (res.status === 401) {
+           console.warn("[MMM-SunGrow] Battery request got 401 => token expired?");
+           this.token = null;
+           await this.loginToISolarCloud();
+           return;
+         }
+         throw new Error(`Battery data HTTP error! status: ${res.status}`);
+       }
 
-    const json = await res.json();
-    if (json.result_code !== "1") {
-      throw new Error(`Battery data error: ${json.result_msg}`);
-    }
+       const json = await res.json();
+       if (json.result_code !== "1") {
+         throw new Error(`Battery data error: ${json.result_msg}`);
+       }
 
-    // device_point includes p58604=SoC fraction, p58608=status code, p58601=voltage, p58602=amperage
-    const dp = json.result_data.device_point_list?.[0]?.device_point;
-    if (!dp) {
-      console.warn("[MMM-SunGrow] No device_point in battery response");
-      return;
-    }
+       // device_point includes p58604=SoC fraction, p58608=status code, p58601=voltage, p58602=amperage
+       const dp = json.result_data.device_point_list?.[0]?.device_point;
+       if (!dp) {
+         console.warn("[MMM-SunGrow] No device_point in battery response");
+         return;
+       }
 
-    // Convert strings to floats
-    const socFraction = parseFloat(dp.p58604) || 0;  // e.g. "0.448" => 0.448
-    const voltage = parseFloat(dp.p58601) || 0;      // e.g. 260.9
-    const current = parseFloat(dp.p58602) || 0;      // e.g. 1.9
-    const statusCode = dp.p58608 || "0";             // e.g. "2"
+       // Convert strings to floats
+       const socFraction = parseFloat(dp.p58604) || 0;  // e.g. "0.448" => 0.448
+       const voltage = parseFloat(dp.p58601) || 0;      // e.g. 260.9
+       const current = parseFloat(dp.p58602) || 0;      // e.g. 1.9
+       const statusCode = dp.p58608 || "0";             // e.g. "2"
 
-    // Map numeric codes to text
-    let statusText;
-    // We'll also define connections as an array of {from, to} objects
-    const connections = [];
-    switch (statusCode) {
-      case "1":
-        statusText = "Charging";
-        // If the battery is charging, let's say "LOAD" -> "STORAGE"
-        // so the front-end gets "load_storage"
-        connections.push({ from: "LOAD", to: "STORAGE" });
-        break;
-      case "2":
-        statusText = "Discharging";
-        // If the battery is discharging, "STORAGE" -> "LOAD"
-        // => "storage_load"
-        connections.push({ from: "STORAGE", to: "LOAD" });
-        break;
-      case "0":
-        statusText = "Idle";
-        // No arrow for idle
-        break;
-      default:
-        statusText = `Unknown(${statusCode})`;
-        // Also no arrow
-    }
+       // Map numeric codes to text
+       let statusText;
+       // We'll also define connections as an array of {from, to} objects
+       const connections = [];
+       switch (statusCode) {
+         case "1":
+           statusText = "Charging";
+           // If the battery is charging, let's say "LOAD" -> "STORAGE"
+           // so the front-end gets "load_storage"
+           connections.push({ from: "LOAD", to: "STORAGE" });
+           break;
+         case "2":
+           statusText = "Discharging";
+           // If the battery is discharging, "STORAGE" -> "LOAD"
+           // => "storage_load"
+           connections.push({ from: "STORAGE", to: "LOAD" });
+           break;
+         case "0":
+           statusText = "Idle";
+           // No arrow for idle
+           break;
+         default:
+           statusText = `Unknown(${statusCode})`;
+           // Also no arrow
+       }
 
-    // Approximate power in watts
-    const powerW = voltage * current;
+       // Approximate power in watts
+       const powerW = voltage * current;
 
-    // Build old structure
-    const transformed = {
-      siteCurrentPowerFlow: {
-        STORAGE: {
-          currentPower: powerW,             // e.g. 495.71
-          status: statusText,               // "Charging", "Discharging", "Idle", ...
-          chargeLevel: socFraction * 100    // e.g. 44.8
-        },
-        // Provide placeholders for other sub-objects if you want
-        PV:   { currentPower: 0, status: "Unknown" },
-        LOAD: { currentPower: 0, status: "Unknown" },
-        GRID: { currentPower: 0, status: "Unknown" },
-        // Insert our arrow logic here
-        connections: connections,
-        unit: "W"
-      }
-    };
+       // Build old structure
+       const transformed = {
+         siteCurrentPowerFlow: {
+           STORAGE: {
+             currentPower: powerW,             // e.g. 495.71
+             status: statusText,               // "Charging", "Discharging", "Idle", ...
+             chargeLevel: socFraction * 100    // e.g. 44.8
+           },
+           // Provide placeholders for other sub-objects if you want
+           PV:   { currentPower: 0, status: "Unknown" },
+           LOAD: { currentPower: 0, status: "Unknown" },
+           GRID: { currentPower: 0, status: "Unknown" },
+           // Insert our arrow logic here
+           connections: connections,
+           unit: "W"
+         }
+       };
 
-    // Send to the front-end
-    this.sendSocketNotification(
-      "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED",
-      transformed
-    );
+       // Send to the front-end
+       this.sendSocketNotification(
+         "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED",
+         transformed
+       );
 
-  } catch (error) {
-    console.error("[MMM-SunGrow] fetchStorageData error:", error);
-    this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
-  }
-}
+     } catch (error) {
+       console.error("[MMM-SunGrow] fetchStorageData error:", error);
+       this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
+     }
+   }
 
-;
+
+});
