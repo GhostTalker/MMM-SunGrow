@@ -285,13 +285,12 @@ module.exports = NodeHelper.create({
            unit: "W"
          }
        };
-
+       console.log("[MMM-SunGrow] Received data:", transformed)
        // Send to the front-end
        this.sendSocketNotification(
          "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED",
          transformed
        );
-       console.log("[MMM-SunGrow] Received data:", transformed)
      } catch (error) {
        console.error("[MMM-SunGrow] fetchStorageData error:", error);
        this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
