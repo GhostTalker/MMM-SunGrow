@@ -243,10 +243,10 @@ module.exports = NodeHelper.create({
       const url = `${this.config.portalUrl}/openapi/getDeviceRealTimeData`;
       const body = {
         appkey: this.config.appKey || "",
-        device_type: "43",
+        device_type: "14",
         lang: "_en_US",
-        point_id_list: ["58604", "58608", "58601", "58602"], // SoC, status, voltage, current
-        ps_key_list: [ "5326778_43_2_1" ],  // or from config
+        point_id_list: ["13126", "13150", "13141", "13119"], // SoC, status, voltage, current
+        ps_key_list: [ '${this.config.plantId}_14_1_1' ],  // or from config
         sys_code: "207",
         token: this.token
       };
@@ -274,63 +274,41 @@ module.exports = NodeHelper.create({
         throw new Error(`Battery data error: ${json.result_msg}`);
       }
 
-      const storage_dp = json.result_data.device_point_list?.[0]?.device_point;
-      if (!storage_dp) {
+      const dp = json.result_data.device_point_list?.[0]?.device_point;
+      if (!dp) {
         console.warn("[MMM-SunGrow] No device_point in battery response");
         return;
       }
 
-      // Convert strings to floats
-      const devStorageChargeLevel = parseFloat(storage_dp.p58604) || 0; // e.g. 0.448 => 44.8%
-      const devStoragevoltage = parseFloat(storage_dp.p58601) || 0;     // e.g. 260.9
-      const devStoragecurrent = parseFloat(storage_dp.p58602) || 0;     // e.g. 1.9
+      // Extract numeric values
+      const batteryChargingPower = parseFloat(dp.p13126) || 0;   // Battery Charging
+      const batteryDischargingPower = parseFloat(dp.p13150) || 0; // Battery Discharging
+      const devStorageChargeLevel = parseFloat(dp.p13141) || 0;   // Battery Charge Level
+      const devLoadPowerW = parseFloat(dp.p13119) || 0;   // Battery Charge Level
 
-      // dev_status => 0=Idle,1=Active,2=Disabled
-      const devStorage_status = String(storage_dp.dev_status || 0);
-      let devStorageStatus;
-      switch (devStorage_status) {
-        case "1":
-          devStorageStatus = "Active";
-          break;
-        case "2":
-          devStorageStatus = "Disabled";
-          break;
-        case "0":
-          devStorageStatus = "Idle";
-          break;
-        default:
-          devStorageStatus = `Unknown(${devStorage_status})`;
-      }
-
-      // Build the arrow connections array
+      // Build arrow connections & currentPower
       const connections = [];
+      let devStoragePowerW = 0;
 
-      // Power in W = voltage * current
-      let devStoragePowerW = devStoragevoltage * devStoragecurrent;
-
-      // If devStoragePowerW is negative => from PV to STORAGE
-      //   and we make devStoragePowerW positive for display
-      if (devStoragePowerW < 0) {
+      // If chargingPower > 0 => from PV to STORAGE
+      if (batteryChargingPower > 0) {
         connections.push({ from: "PV", to: "STORAGE" });
-        devStoragePowerW = Math.abs(devStoragePowerW);
-      // else if devStoragePowerW is positive => from STORAGE to LOAD
-      } else if (devStoragePowerW > 0) {
+        devStoragePowerW = batteryChargingPower;
+      // Else if dischargingPower > 0 => from STORAGE to LOAD
+      } else if (batteryDischargingPower > 0) {
         connections.push({ from: "STORAGE", to: "LOAD" });
+        devStoragePowerW = batteryDischargingPower;
+      // Else both 0 => no arrow, currentPower=0
       }
-      // if exactly 0 => no arrow
 
 
       // Now build the final data structure
       const transformed = {
         siteCurrentPowerFlow: {
-          STORAGE: {
-            currentPower: devStoragePowerW,
-            status: devStorageStatus,
-            chargeLevel: devStorageChargeLevel * 100
-          },
-          PV:   { currentPower: 0, status: "Unknown" },
-          LOAD: { currentPower: 0, status: "Unknown" },
-          GRID: { currentPower: 0, status: "Unknown" },
+          STORAGE: { currentPower: devStoragePowerW, status: "Active", chargeLevel: devStorageChargeLevel * 100 },
+          PV:   { currentPower: 0, status: "Active" },
+          LOAD: { currentPower: devLoadPowerW, status: "Active" },
+          GRID: { currentPower: 0, status: "Active" },
           connections: connections,
           unit: "W"
         }
