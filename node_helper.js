@@ -52,7 +52,7 @@ module.exports = NodeHelper.create({
       case "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_REQUESTED":
         // e.g. battery/storage data
         await this.ensureLogin();
-        this.fetchStorageData();
+        this.fetchCurrentPowerData();
         break;
 
       case "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_REQUESTED":
@@ -232,9 +232,9 @@ module.exports = NodeHelper.create({
    * Calls /openapi/getBatteryMeasuringPoints for battery SoC, status, etc.
    * Maps them to siteCurrentPowerFlow.STORAGE in the old format.
    */
-  fetchStorageData: async function () {
+  fetchCurrentPowerData: async function () {
     if (!this.token) {
-      console.warn("[MMM-SunGrow] No token, cannot fetch storage data!");
+      console.warn("[MMM-SunGrow] No token, cannot fetch current power data!");
       this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
       return;
     }
@@ -274,47 +274,56 @@ module.exports = NodeHelper.create({
         throw new Error(`Battery data error: ${json.result_msg}`);
       }
 
-      const dp = json.result_data.device_point_list?.[0]?.device_point;
-      if (!dp) {
+      const storage_dp = json.result_data.device_point_list?.[0]?.device_point;
+      if (!storage_dp) {
         console.warn("[MMM-SunGrow] No device_point in battery response");
         return;
       }
 
       // Convert strings to floats
-      const socFraction = parseFloat(dp.p58604) || 0; // e.g. 0.448 => 44.8%
-      const voltage = parseFloat(dp.p58601) || 0;     // e.g. 260.9
-      const current = parseFloat(dp.p58602) || 0;     // e.g. 1.9
-      const statusCode = dp.p58608 || "0";            // "1"=charging, "2"=discharging, "0"=idle
+      const devStorageChargeLevel = parseFloat(storage_dp.p58604) || 0; // e.g. 0.448 => 44.8%
+      const devStoragevoltage = parseFloat(storage_dp.p58601) || 0;     // e.g. 260.9
+      const devStoragecurrent = parseFloat(storage_dp.p58602) || 0;     // e.g. 1.9
+      const devStorageOperationModus = storage_dp.p58608 || "0.0";        // "1"=charging, "2"=discharging, "0"=idle
+      const devStorage_status = storage_dp.dev_status || 0;
 
-      let statusText;
-      const connections = [];
-      switch (statusCode) {
+      switch (devStorage_status) {
         case "1":
-          statusText = "Charging";
-          // "LOAD" -> "STORAGE"
-          connections.push({ from: "LOAD", to: "STORAGE" });
+          devStorageStatus = "Active";
           break;
         case "2":
-          statusText = "Discharging";
-          // "STORAGE" -> "LOAD"
-          connections.push({ from: "STORAGE", to: "LOAD" });
+          devStorageStatus = "Disabled";
           break;
         case "0":
-          statusText = "Idle";
+          devStorageStatus = "Idle";
           break;
         default:
           statusText = `Unknown(${statusCode})`;
       }
 
+      const connections = [];
+
+      switch (devStorageOperationModus) {
+        case "1.0":
+          connections.push({ from: "PV", to: "STORAGE" });
+          break;
+        case "2.0":
+          connections.push({ from: "STORAGE", to: "LOAD" });
+          break;
+        default:
+          // do nothing
+          break;
+}
+
       // Power in W = voltage * current
-      const powerW = voltage * current;
+      const devStoragePowerW = devStoragevoltage * devStoragecurrent;
 
       const transformed = {
         siteCurrentPowerFlow: {
           STORAGE: {
-            currentPower: powerW,
-            status: statusText,
-            chargeLevel: socFraction * 100
+            currentPower: devStoragePowerW,
+            status: devStorageStatus,
+            chargeLevel: devStorageChargeLevel * 100
           },
           PV:   { currentPower: 0, status: "Unknown" },
           LOAD: { currentPower: 0, status: "Unknown" },
