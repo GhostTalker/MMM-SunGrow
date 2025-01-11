@@ -245,7 +245,7 @@ module.exports = NodeHelper.create({
         appkey: this.config.appKey || "",
         device_type: "14",
         lang: "_en_US",
-        point_id_list: ["13126", "13150", "13141", "13119"], // SoC, status, voltage, current
+        point_id_list: ["13126", "13150", "13141", "13119","13011"], // SoC, status, voltage, current
         ps_key_list: [ `${this.config.plantId}_14_1_1` ],  // or from config
         sys_code: "207",
         token: this.token
@@ -284,7 +284,9 @@ module.exports = NodeHelper.create({
       const batteryChargingPower = parseFloat(dp.p13126) || 0;   // Battery Charging
       const batteryDischargingPower = parseFloat(dp.p13150) || 0; // Battery Discharging
       const devStorageChargeLevel = parseFloat(dp.p13141) || 0;   // Battery Charge Level
-      const devLoadPowerW = parseFloat(dp.p13119) || 0;   // Battery Charge Level
+      const devLoadPowerW = parseFloat(dp.p13119) || 0;   // actual LOAD power
+      const devPvPower"" = parseFloat(dp.p13011) || 0;   // actual PV power
+
 
       // Build arrow connections & currentPower
       const connections = [];
@@ -306,7 +308,7 @@ module.exports = NodeHelper.create({
       const transformed = {
         siteCurrentPowerFlow: {
           STORAGE: { currentPower: devStoragePowerW, status: "Active", chargeLevel: devStorageChargeLevel * 100 },
-          PV:   { currentPower: 0, status: "Active" },
+          PV:   { currentPower: devPvPower, status: "Active" },
           LOAD: { currentPower: devLoadPowerW, status: "Active" },
           GRID: { currentPower: 0, status: "Active" },
           connections: connections,
@@ -314,7 +316,7 @@ module.exports = NodeHelper.create({
         }
       };
 
-      console.log("[MMM-SunGrow] Storage data:", transformed);
+      console.log("[MMM-SunGrow] Current power data:", transformed);
       this.sendSocketNotification(
         "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED",
         transformed
