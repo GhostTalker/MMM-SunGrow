@@ -284,9 +284,10 @@ module.exports = NodeHelper.create({
       const devStorageChargeLevel = parseFloat(storage_dp.p58604) || 0; // e.g. 0.448 => 44.8%
       const devStoragevoltage = parseFloat(storage_dp.p58601) || 0;     // e.g. 260.9
       const devStoragecurrent = parseFloat(storage_dp.p58602) || 0;     // e.g. 1.9
-      const devStorageOperationModus = storage_dp.p58608 || "0.0";        // "1"=charging, "2"=discharging, "0"=idle
-      const devStorage_status = storage_dp.dev_status || 0;
 
+      // dev_status => 0=Idle,1=Active,2=Disabled
+      const devStorage_status = String(storage_dp.dev_status || 0);
+      let devStorageStatus;
       switch (devStorage_status) {
         case "1":
           devStorageStatus = "Active";
@@ -301,23 +302,25 @@ module.exports = NodeHelper.create({
           devStorageStatus = `Unknown(${devStorage_status})`;
       }
 
+      // Build the arrow connections array
       const connections = [];
 
-      switch (devStorageOperationModus) {
-        case "1.0":
-          connections.push({ from: "PV", to: "STORAGE" });
-          break;
-        case "2.0":
-          connections.push({ from: "STORAGE", to: "LOAD" });
-          break;
-        default:
-          // do nothing
-          break;
-}
-
       // Power in W = voltage * current
-      const devStoragePowerW = devStoragevoltage * devStoragecurrent;
+      let devStoragePowerW = devStoragevoltage * devStoragecurrent;
 
+      // If devStoragePowerW is negative => from PV to STORAGE
+      //   and we make devStoragePowerW positive for display
+      if (devStoragePowerW < 0) {
+        connections.push({ from: "PV", to: "STORAGE" });
+        devStoragePowerW = Math.abs(devStoragePowerW);
+      // else if devStoragePowerW is positive => from STORAGE to LOAD
+      } else if (devStoragePowerW > 0) {
+        connections.push({ from: "STORAGE", to: "LOAD" });
+      }
+      // if exactly 0 => no arrow
+
+
+      // Now build the final data structure
       const transformed = {
         siteCurrentPowerFlow: {
           STORAGE: {
