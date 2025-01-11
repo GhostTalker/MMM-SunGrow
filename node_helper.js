@@ -358,7 +358,8 @@ module.exports = NodeHelper.create({
         }
       };
 
-      console.log("[MMM-SunGrow] Current power data:", transformed);
+      // DEBUGGING:
+      // console.log("[MMM-SunGrow] Current power data:", transformed);
       this.sendSocketNotification(
         "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED",
         transformed
@@ -366,40 +367,6 @@ module.exports = NodeHelper.create({
 
     } catch (error) {
       console.error("[MMM-SunGrow] fetchStorageData error:", error);
-      this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
-    }
-  },
-
-  /**
-   * fetchOverviewData():
-   * A placeholder. Fill in with the actual iSolarCloud endpoint and
-   * transform the response as needed, then send "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_RECEIVED".
-   */
-  fetchOverviewData: async function () {
-    if (!this.token) {
-      console.warn("[MMM-SunGrow] No token for overview!");
-      this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
-      return;
-    }
-    console.log("[MMM-SunGrow] fetchOverviewData() called - placeholder");
-
-    try {
-      // e.g. call "/openapi/overview"
-      // For now, dummy data:
-      const result = {
-        overview: {
-          lastDayData: { energy: 5000 },    // 5,000 Wh
-          lastMonthData: { energy: 30000 }, // 30,000 Wh
-          lastYearData: { energy: 200000 }  // 200 kWh
-        }
-      };
-      this.sendSocketNotification(
-        "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_RECEIVED",
-        result
-      );
-
-    } catch (error) {
-      console.error("[MMM-SunGrow] fetchOverviewData error:", error);
       this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
     }
   },

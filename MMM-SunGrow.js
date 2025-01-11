@@ -109,14 +109,14 @@ Module.register("MMM-SunGrow", {
     );
   },
 
-  getOverviewData: function () {
-    this.sendSocketNotification(
-      "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_REQUESTED",
-      {
-        config: this.config
-      }
-    );
-  },
+//  getOverviewData: function () {
+//    this.sendSocketNotification(
+//      "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_REQUESTED",
+//      {
+//        config: this.config
+//      }
+//    );
+//  },
 
   getDayEnergyData: function () {
     this.sendSocketNotification(
