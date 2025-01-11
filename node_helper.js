@@ -1,13 +1,13 @@
 /* node_helper.js
  * MagicMirror Module: MMM-SunGrow
  *
- * This node_helper:
- * 1) Logs into iSolarCloud on demand
- * 2) Handles requests for:
- *    - DETAILS   (fetchDetailsData)
- *    - CURRENT POWER/BATTERY (fetchStorageData)
- *    - OVERVIEW (fetchOverviewData) - placeholder
- *    - DAY ENERGY (fetchDayEnergyData) - placeholder
+ * Features:
+ * - Single login & token reuse
+ * - Handling of four data requests:
+ *    1) DETAILS_DATA
+ *    2) CURRENTPOWER_DATA (storage/battery)
+ *    3) OVERVIEW_DATA (placeholder)
+ *    4) DAY_ENERGY_DATA (placeholder)
  */
 
 const NodeHelper = require("node_helper");
@@ -15,64 +15,103 @@ const fetch = require("node-fetch");
 
 module.exports = NodeHelper.create({
 
-  // 1) Initialize
+  // Variables we'll use:
   start: function () {
     console.log("[MMM-SunGrow] node_helper started...");
     this.config = null;
-    this.token = null; // We'll store the iSolarCloud token here
+    this.token = null;           // We'll store the iSolarCloud token here
+    this.loginInProgress = false; // Prevent multiple logins at once
   },
 
-  // 2) Handle incoming notifications from MMM-SunGrow.js
+  /**
+   * MagicMirror will call socketNotificationReceived() whenever
+   * the front-end sends a notification. We'll handle:
+   * - "SUN_GROW_CONFIG" (initial config)
+   * - "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_REQUESTED"
+   * - "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_REQUESTED"
+   * - "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_REQUESTED"
+   * - "MMM-SunGrow-NOTIFICATION_SUNGROW_DAY_ENERGY_DATA_REQUESTED"
+   */
   socketNotificationReceived: async function (notification, payload) {
     if (notification === "SUN_GROW_CONFIG") {
+      // Save the config
       this.config = payload;
       console.log("[MMM-SunGrow] Received config:", this.config);
-
-      // If we have no token yet, do an initial login
-      if (!this.token) {
-        await this.loginToISolarCloud();
-      }
       return;
     }
 
-    // Listen for data requests from the front-end
+    // Then check which data request we got:
     switch (notification) {
 
       case "MMM-SunGrow-NOTIFICATION_SUNGROW_DETAILS_DATA_REQUESTED":
-        if (!this.token) {
-          await this.loginToISolarCloud();
-        }
+        // Ensure we have a valid token, then fetch details
+        await this.ensureLogin();
         this.fetchDetailsData();
         break;
 
       case "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_REQUESTED":
-        if (!this.token) {
-          await this.loginToISolarCloud();
-        }
+        // e.g. battery/storage data
+        await this.ensureLogin();
         this.fetchStorageData();
         break;
 
       case "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_REQUESTED":
-        if (!this.token) {
-          await this.loginToISolarCloud();
-        }
-        this.fetchOverviewData(); // placeholder below
+        await this.ensureLogin();
+        this.fetchOverviewData();
         break;
 
       case "MMM-SunGrow-NOTIFICATION_SUNGROW_DAY_ENERGY_DATA_REQUESTED":
-        if (!this.token) {
-          await this.loginToISolarCloud();
-        }
-        this.fetchDayEnergyData(); // placeholder below
+        await this.ensureLogin();
+        this.fetchDayEnergyData();
         break;
     }
   },
 
-  // 3) Login method for iSolarCloud
+  /**
+   * ensureLogin():
+   * If we have no token, we attempt a login; if a login is already in progress,
+   * we wait until it's finished. This avoids multiple logins at the same time.
+   */
+  ensureLogin: async function () {
+    // If we already have a valid token, do nothing:
+    if (this.token) {
+      return;
+    }
+
+    // If a login is already in progress, wait until it completes
+    if (this.loginInProgress) {
+      console.log("[MMM-SunGrow] Waiting for ongoing login to finish...");
+      while (this.loginInProgress) {
+        // Sleep 500ms, then check again
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      return;
+    }
+
+    // Otherwise, do a fresh login
+    this.loginInProgress = true;
+    try {
+      await this.loginToISolarCloud();
+    } finally {
+      this.loginInProgress = false;
+    }
+  },
+
+  /**
+   * loginToISolarCloud():
+   * Logs in to iSolarCloud using the config’s user/password, appKey, secretKey, etc.
+   * We'll store the token in this.token once done.
+   */
   loginToISolarCloud: async function () {
     try {
+      if (!this.config) {
+        throw new Error("No config found. Did you send SUN_GROW_CONFIG?");
+      }
       if (!this.config.userName || !this.config.userPassword) {
         throw new Error("No user/password provided in config for iSolarCloud login.");
+      }
+      if (!this.config.portalUrl) {
+        throw new Error("No portalUrl specified in config.");
       }
 
       const loginUrl = `${this.config.portalUrl}/openapi/login`;
@@ -108,17 +147,24 @@ module.exports = NodeHelper.create({
 
     } catch (error) {
       console.error("[MMM-SunGrow] Error in loginToISolarCloud:", error);
+      // We do NOT nullify this.token here, because it might not have been set yet
       this.sendSocketNotification("SUN_GROW_ERROR", { message: error.message });
     }
   },
 
-  // 4) DETAILS (Plant Info) - /openapi/getPowerStationDetail
+  /**
+   * fetchDetailsData():
+   * Calls /openapi/getPowerStationDetail for "details" data
+   * and transforms to the old "details" structure:
+   *   { details: { location: { address }, peakPower } }
+   */
   fetchDetailsData: async function () {
     if (!this.token) {
       console.warn("[MMM-SunGrow] No token, cannot fetch details data!");
       this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
       return;
     }
+
     if (!this.config.plantSN) {
       console.warn("[MMM-SunGrow] No plantSN in config!");
       this.sendSocketNotification("SUN_GROW_ERROR", { message: "No sn in config." });
@@ -131,7 +177,7 @@ module.exports = NodeHelper.create({
         appkey: this.config.appKey || "",
         is_get_ps_remarks: "1",
         lang: "_en_US",
-        sn: this.config.plantSN, // e.g. "B22C2803603"
+        sn: this.config.plantSN,
         sys_code: "207",
         token: this.token
       };
@@ -149,7 +195,6 @@ module.exports = NodeHelper.create({
         if (res.status === 401) {
           console.warn("[MMM-SunGrow] Token might have expired. Re-login needed.");
           this.token = null;
-          await this.loginToISolarCloud();
           return;
         }
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -160,8 +205,8 @@ module.exports = NodeHelper.create({
         throw new Error(`getPowerStationDetail error: ${json.result_msg}`);
       }
 
-      // Transform the result to old "details" structure
-      const rd = json.result_data;
+      // E.g. { design_capacity, ps_location, ... }
+      const rd = json.result_data || {};
       const transformed = {
         details: {
           location: {
@@ -182,7 +227,11 @@ module.exports = NodeHelper.create({
     }
   },
 
-  // 5) CURRENT POWER (Battery/Storage Info) - /openapi/getBatteryMeasuringPoints
+  /**
+   * fetchStorageData():
+   * Calls /openapi/getBatteryMeasuringPoints for battery SoC, status, etc.
+   * Maps them to siteCurrentPowerFlow.STORAGE in the old format.
+   */
   fetchStorageData: async function () {
     if (!this.token) {
       console.warn("[MMM-SunGrow] No token, cannot fetch storage data!");
@@ -196,8 +245,8 @@ module.exports = NodeHelper.create({
         appkey: this.config.appKey || "",
         device_type: "43",
         lang: "_en_US",
-        point_id_list: ["58604", "58608", "58601", "58602"],
-        ps_key_list: [ "5326778_43_2_1" ],  // or read from config
+        point_id_list: ["58604", "58608", "58601", "58602"], // SoC, status, voltage, current
+        ps_key_list: [ "5326778_43_2_1" ],  // or from config
         sys_code: "207",
         token: this.token
       };
@@ -213,9 +262,8 @@ module.exports = NodeHelper.create({
 
       if (!res.ok) {
         if (res.status === 401) {
-          console.warn("[MMM-SunGrow] Storage request 401 => token expired?");
+          console.warn("[MMM-SunGrow] Battery request got 401 => token expired?");
           this.token = null;
-          await this.loginToISolarCloud();
           return;
         }
         throw new Error(`Battery data HTTP error! status: ${res.status}`);
@@ -226,30 +274,29 @@ module.exports = NodeHelper.create({
         throw new Error(`Battery data error: ${json.result_msg}`);
       }
 
-      // device_point includes p58604 (SoC fraction), p58608 (status code), p58601 (voltage), p58602 (amp)
       const dp = json.result_data.device_point_list?.[0]?.device_point;
       if (!dp) {
         console.warn("[MMM-SunGrow] No device_point in battery response");
         return;
       }
 
-      // Convert string fields to floats or handle as needed
-      const socFraction = parseFloat(dp.p58604) || 0;
-      const voltage = parseFloat(dp.p58601) || 0;
-      const current = parseFloat(dp.p58602) || 0;
-      const statusCode = dp.p58608 || "0";
+      // Convert strings to floats
+      const socFraction = parseFloat(dp.p58604) || 0; // e.g. 0.448 => 44.8%
+      const voltage = parseFloat(dp.p58601) || 0;     // e.g. 260.9
+      const current = parseFloat(dp.p58602) || 0;     // e.g. 1.9
+      const statusCode = dp.p58608 || "0";            // "1"=charging, "2"=discharging, "0"=idle
 
       let statusText;
       const connections = [];
-
-      // 1 = Charging, 2 = Discharging, 0 = Idle
       switch (statusCode) {
         case "1":
           statusText = "Charging";
+          // "LOAD" -> "STORAGE"
           connections.push({ from: "LOAD", to: "STORAGE" });
           break;
         case "2":
           statusText = "Discharging";
+          // "STORAGE" -> "LOAD"
           connections.push({ from: "STORAGE", to: "LOAD" });
           break;
         case "0":
@@ -259,10 +306,9 @@ module.exports = NodeHelper.create({
           statusText = `Unknown(${statusCode})`;
       }
 
-      // Approx power in watts
+      // Power in W = voltage * current
       const powerW = voltage * current;
 
-      // Build old structure
       const transformed = {
         siteCurrentPowerFlow: {
           STORAGE: {
@@ -279,7 +325,6 @@ module.exports = NodeHelper.create({
       };
 
       console.log("[MMM-SunGrow] Storage data:", transformed);
-
       this.sendSocketNotification(
         "MMM-SunGrow-NOTIFICATION_SUNGROW_CURRENTPOWER_DATA_RECEIVED",
         transformed
@@ -291,32 +336,29 @@ module.exports = NodeHelper.create({
     }
   },
 
-  // 6) Overview (Placeholder Example)
+  /**
+   * fetchOverviewData():
+   * A placeholder. Fill in with the actual iSolarCloud endpoint and
+   * transform the response as needed, then send "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_RECEIVED".
+   */
   fetchOverviewData: async function () {
     if (!this.token) {
       console.warn("[MMM-SunGrow] No token for overview!");
       this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
       return;
     }
+    console.log("[MMM-SunGrow] fetchOverviewData() called - placeholder");
 
     try {
-      // 1) Call your iSolarCloud endpoint for overview
-      //    e.g., `${this.config.portalUrl}/openapi/getOverviewData`
-      //    We'll do a placeholder:
-      console.log("[MMM-SunGrow] fetchOverviewData() called - placeholder");
-
-      // For example:
+      // e.g. call "/openapi/overview"
+      // For now, dummy data:
       const result = {
         overview: {
-          // fill with data from the real endpoint
-          lastDayData: { energy: 5000 },   // e.g. 5,000 Wh => 5 kWh
-          lastMonthData: { energy: 30000 }, // 30 kWh
+          lastDayData: { energy: 5000 },    // 5,000 Wh
+          lastMonthData: { energy: 30000 }, // 30,000 Wh
           lastYearData: { energy: 200000 }  // 200 kWh
         }
       };
-
-      // Transform or just pass it as-is:
-      // The old code expects dataNotificationOverview.overview in the front-end
       this.sendSocketNotification(
         "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_RECEIVED",
         result
@@ -328,31 +370,33 @@ module.exports = NodeHelper.create({
     }
   },
 
-  // 7) Day Energy (Placeholder Example)
+  /**
+   * fetchDayEnergyData():
+   * Another placeholder for daily energy endpoint. Convert the
+   * JSON to the old structure e.g. `dataNotificationDayEnergy.energyDetails`.
+   */
   fetchDayEnergyData: async function () {
     if (!this.token) {
       console.warn("[MMM-SunGrow] No token for day energy!");
       this.sendSocketNotification("SUN_GROW_ERROR", { message: "No token available." });
       return;
     }
+    console.log("[MMM-SunGrow] fetchDayEnergyData() called - placeholder");
 
     try {
-      // 1) Call your iSolarCloud endpoint for day energy
-      console.log("[MMM-SunGrow] fetchDayEnergyData() called - placeholder");
-
-      // Example placeholder:
+      // e.g. call "/openapi/getDayEnergy"
+      // For now, dummy data:
       const result = {
         energyDetails: {
           meters: [
-            { type: "Production", values: [{ value: 4000 }] },     // 4,000 Wh => 4 kWh
-            { type: "Consumption", values: [{ value: 2000 }] },   // 2,000 Wh => 2 kWh
-            { type: "FeedIn", values: [{ value: 1000 }] },        // 1,000 Wh
-            { type: "Purchased", values: [{ value: 500 }] },      // 500 Wh
-            { type: "SelfConsumption", values: [{ value: 1500 }] }// 1,500 Wh
+            { type: "Production", values: [{ value: 4000 }] },
+            { type: "Consumption", values: [{ value: 2000 }] },
+            { type: "FeedIn", values: [{ value: 1000 }] },
+            { type: "Purchased", values: [{ value: 500 }] },
+            { type: "SelfConsumption", values: [{ value: 1500 }] }
           ]
         }
       };
-
       this.sendSocketNotification(
         "MMM-SunGrow-NOTIFICATION_SUNGROW_DAY_ENERGY_DATA_RECEIVED",
         result
