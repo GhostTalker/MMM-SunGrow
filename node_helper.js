@@ -228,9 +228,8 @@ module.exports = NodeHelper.create({
   },
 
   /**
-   * fetchStorageData():
-   * Calls /openapi/getBatteryMeasuringPoints for battery SoC, status, etc.
-   * Maps them to siteCurrentPowerFlow.STORAGE in the old format.
+   * fetchCurrentPowerData():
+   * Calls /openapi/getDeviceRealTimeData for current power data
    */
   fetchCurrentPowerData: async function () {
     if (!this.token) {
@@ -240,16 +239,34 @@ module.exports = NodeHelper.create({
     }
 
     try {
-      const url = `${this.config.portalUrl}/openapi/getDeviceRealTimeData`;
-      const body = {
-        appkey: this.config.appKey || "",
-        device_type: "14",
-        lang: "_en_US",
-        point_id_list: ["13126", "13150", "13141", "13119","13011"], // SoC, status, voltage, current
-        ps_key_list: [ `${this.config.plantId}_14_1_1` ],  // or from config
-        sys_code: "207",
-        token: this.token
-      };
+        const url = `${this.config.portalUrl}/openapi/getDeviceRealTimeData`;
+
+        // We request measuring points for:
+        //   - 13126: Battery Charging Power
+        //   - 13150: Battery Discharging Power
+        //   - 13141: Battery Level (SOC)
+        //   - 13119: Load Power
+        //   - 13011: PV Active Power
+        //   - 13121: Feed-in Power
+        //   - 13149: Purchased Power
+        const body = {
+          appkey: this.config.appKey || "",
+          device_type: "14",
+          lang: "_en_US",
+          point_id_list: [
+            "13126", // batteryChargingPower
+            "13150", // batteryDischargingPower
+            "13141", // batterySoC
+            "13119", // loadPower
+            "13011", // pvPower
+            "13121", // feedInPower
+            "13149"  // purchasedPower
+          ],
+          // Construct ps_key_list dynamically from config.plantId
+          ps_key_list: [ `${this.config.plantId}_14_1_1` ],
+          sys_code: "207",
+          token: this.token
+        };
 
       const res = await fetch(url, {
         method: "POST",
@@ -280,12 +297,20 @@ module.exports = NodeHelper.create({
         return;
       }
 
-      // Extract numeric values
-      const batteryChargingPower = parseFloat(dp.p13126) || 0;   // Battery Charging
-      const batteryDischargingPower = parseFloat(dp.p13150) || 0; // Battery Discharging
-      const devStorageChargeLevel = parseFloat(dp.p13141) || 0;   // Battery Charge Level
-      const devLoadPowerW = parseFloat(dp.p13119) || 0;   // actual LOAD power
-      const devPvPower = parseFloat(dp.p13011) || 0;   // actual PV power
+      // 1) Battery charging/discharging
+      const batteryChargingPower = parseFloat(dp.p13126) || 0;
+      const batteryDischargingPower = parseFloat(dp.p13150) || 0;
+      const batterySoC = parseFloat(dp.p13141) || 0; // 0..1 in fraction or 0..100?
+      // 2) Load Power
+      const loadPowerW = parseFloat(dp.p13119) || 0;
+      // 3) PV Power
+      const pvPowerW = parseFloat(dp.p13011) || 0;
+      // 4) Grid (FeedIn vs. Purchased)
+      const feedInPower = parseFloat(dp.p13121) || 0;
+      const purchasedPower = parseFloat(dp.p13149) || 0;
+      // Net grid power = feedIn - purchased
+      let netGridPower = feedInPower - purchasedPower;
+      let gridPowerW = 0; // the final value we store in transformed, always >= 0
 
 
       // Build arrow connections & currentPower
@@ -303,19 +328,32 @@ module.exports = NodeHelper.create({
       // Else both 0 => no arrow, currentPower=0
       }
 
-      if (devPvPower > 0) {
-        connections.push({ from: "PV", to: "LOAD" });
+      if (pvPowerW > 0) {
+         connections.push({ from: "PV", to: "LOAD" });
       }
 
-      // Now build the final data structure
+      if (netGridPower > 0) {
+        // positive => net feed-in => arrow from "PV" to "GRID"
+        connections.push({ from: "LOAD", to: "GRID" });
+        gridPowerW = netGridPower;     // show as positive
+      } else if (netGridPower < 0) {
+        // negative => net purchase => arrow from "GRID" to "LOAD"
+        connections.push({ from: "GRID", to: "LOAD" });
+        gridPowerW = -netGridPower;    // make it positive for display
+      } else {
+        // zero => no arrow, gridPowerW = 0
+      }
+
+
+      // Build final structure
       const transformed = {
         siteCurrentPowerFlow: {
-          STORAGE: { currentPower: devStoragePowerW, status: "Active", chargeLevel: devStorageChargeLevel * 100 },
-          PV:   { currentPower: devPvPower, status: "Active" },
-          LOAD: { currentPower: devLoadPowerW, status: "Active" },
-          GRID: { currentPower: 0, status: "Active" },
+          STORAGE: { currentPower: batteryPowerW, status: "Active", chargeLevel: batterySoC },
+          PV:      { currentPower: pvPowerW,      status: "Active" },
+          LOAD:    { currentPower: loadPowerW,    status: "Active" },
+          GRID:    { currentPower: gridPowerW,    status: "Active" },
           connections: connections,
-          unit: "W"
+          unit: "kW"
         }
       };
 
