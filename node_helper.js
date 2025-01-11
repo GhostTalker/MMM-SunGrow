@@ -354,7 +354,7 @@ module.exports = NodeHelper.create({
           LOAD:    { currentPower: loadPowerW,    status: "Active" },
           GRID:    { currentPower: gridPowerW,    status: "Active" },
           connections: connections,
-          unit: "kW"
+          unit: "W"
         }
       };
 
