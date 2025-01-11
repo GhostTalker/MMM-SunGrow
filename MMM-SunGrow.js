@@ -4,6 +4,7 @@
  * Module: MMM-SunGrow
  *
  * By GhostTalker
+ * Copyright 2025, The GhostTalker project
  * idea and original code from Stefan Nachtrab
  * MIT Licensed.
  */
@@ -11,7 +12,7 @@
 Module.register("MMM-SunGrow", {
   defaults: {
     retryDelay: 5000,
-    updateInterval: 1000, //every 15 minutes 1000 * 60 * 15
+    updateInterval: 1 * 10 * 1000, //every 10 sec
     appKey: "",
     secretKey: "",
     plantId: "",
@@ -108,15 +109,6 @@ Module.register("MMM-SunGrow", {
       }
     );
   },
-
-//  getOverviewData: function () {
-//    this.sendSocketNotification(
-//      "MMM-SunGrow-NOTIFICATION_SUNGROW_OVERVIEW_DATA_REQUESTED",
-//      {
-//        config: this.config
-//      }
-//    );
-//  },
 
   getDayEnergyData: function () {
     this.sendSocketNotification(

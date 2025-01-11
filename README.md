@@ -1,69 +1,135 @@
 # MMM-SunGrow
-# This is a rework of MMM-SolarEdge to MMM-SunGrow to work with SunGrow API
-# under contruction!!! Not usable at the moment!!!
 
+A MagicMirror² module that integrates with the **SunGrow** monitoring/management API to display real-time data for your SunGrow-based PV and battery storage system.
 
-This is a module for the [MagicMirror²](https://github.com/MichMich/MagicMirror/).
+It is a rework of the Module [MMM-SolarEdge](https://github.com/st3v0rr/MMM-SolarEdge) to work with the SunGrow API. 
 
-A Module for MagicMirror2 designed to integrate with a SolarEdge System. Dependent on your configuration it can display several statistics.
+> **Note**: This module is under active development. Features and API endpoints may change.
 
-- Current Power (dependent on yout module update interval)
-- more will follow...
+---
+
+## Features
+
+- **Current Power**: Displays real-time power flow for:
+    - **PV** (solar generation),
+    - **Battery** (charging/discharging level and SoC),
+    - **Load** (consumption),
+    - **Grid** (feed-in vs. purchased).
+- **Daily Data** (Optional):
+    - Day energy totals (Production, Consumption, FeedIn, Purchased, SelfConsumption).
+- **System Details** (Optional):
+    - Location address, installed capacity, and more.
+
+---
 
 ## Installation
-Go to your MagicMirror folder.
-```bash
-cd modules
-git clone https://github.com/st3v0rr/MMM-SolarEdge.git
-cd MMM-SolarEdge
-npm i
-```
-Wait until npm has finished.
 
-## Using the module
+1. Navigate to your MagicMirror `modules` folder:
 
-To use this module, add the following configuration block to the modules array in the `config/config.js` file:
+   ```bash
+   cd ~/MagicMirror/modules
+2. Clone this repository:
 
-```js
-var config = {
-    modules: [
-        {
-            module: 'MMM-SolarEdge',
-            position: 'lower_third',
-            config: {
-                apiKey: "################################", //Requires your own API Key
-                siteId: "12345", //SolarEdge site ID
-                userName: "youruser", //SolarEdge Monitoring Portal User
-                userPassword: "yourpw", //SolarEdge Monitoring Portal Password
-            }
-        },
-    ]
-}
-```
+   ```bash
+   git clone https://github.com/GhostTalker/MMM-SunGrow.git
+   cd MMM-SunGrow
+   
+3. Install dependencies:
 
-## Configuration options
+   ```bash
+   npm install
 
-| Option                            | Description
-|-----------------                  |-----------
-| `apiKey`                          | *Required* An API Key that can be obtained by creating one in your SolarEdge Monitoring Portal https://monitoring.solaredge.com
-| `siteId`                          | *Required* The Site ID of the SolarEdge system you wish to monitor, which can be found in the Dashboard https://monitoring.solaredge.com
-| `userName`                        | *Required* SolarEdge Monitoring Portal User
-| `userPassword`                    | *Required* SolarEdge Monitoring Portal Password
-| `portalUrl`                       | *Optional* override in case of a proxy, default is https://monitoringapi.solaredge.com
-| `livaDataUrl`                     | *Optional* override in case of a proxy, default is https://monitoring.solaredge.com
-| `updateIntervalBasicData`         | *Optional* Update interval for the basic data like overview or details, default is 15 minutes
-| `showOverview`                    | *Optional* Enables/disables the long term data view, default is true
-| `decimal`                         | *Optional* The decimal symbol that will be used to display numbers. Possible values are "comma" or "period". Default is *comma*.
-| `showDayEnergy`                   | *Optional* Enables/disables the day energy data view, default is true
-| `compactMode`                     | *Optional* Enables/disables compact mode display, default is false
-| `mockData`                        | *Optional* If you like to change something without using the real API, default is false
-** be aware that with custom params you could reach the daily request limit of the SolarEdge API gateway.
+4. Wait until npm finishes installing.
 
-## Samples
-![alt text](/docs/SolarEdgePv.png "Example")
+## Using the Module
 
-![alt text](/docs/SolarEdgePvBattery.png "Example")
+1. **Add the module** to your `config.js`:
 
-![alt text](/docs/SolarEdgePvCompactMode.png "Example")
+   ```js
+   {
+     module: "MMM-SunGrow",
+     position: "lower_third",                       // or your preferred region
+     config: {
+       appKey: "YOUR_APP_KEY",                      // From SunGrow iSolarCloud Developer Portal
+       secretKey: "YOUR_SECRET_KEY",                // From SunGrow iSolarCloud Developer Portal
+       plantId: "xxxxxxx",                          // SunGrow plant id 
+       plantSN: "xxxxxxxxxx",                       // SunGrow plant serialnumber 
+       userName: "yourSunGrowUser",                 // iSolarCloud username
+       userPassword: "yourSunGrowPass",             // iSolarCloud password
+       portalUrl: "https://gateway.isolarcloud.eu", // or your region’s endpoint
+       updateInterval: 10 * 1000,                   // frequency for refreshing real-time data (ms)
+       updateIntervalBasicData: 15 * 60 * 1000,     // e.g., for day data
+       showDayEnergy: true,                         // display daily stats
+       showOverview: false,                         // disable overview by default (placeholder)
+       compactMode: true,
+       decimal: "comma",                            // "comma" or "period"
+       mockData: false                              // for testing without the real API
+     }
+   }
+> Position can be changed to suit your layout.
+> 
+> **Note**: If you only want daily data or only current power, you can disable the other calls in MMM-SunGrow.js or by changing the config flags (e.g., showOverview: false).
 
-![alt text](/docs/SolarEdgePvBatteryCompactMode.png "Example")
+## Configuration Options
+
+| **Option**                 | **Description**                                                                                              |
+|---------------------------|--------------------------------------------------------------------------------------------------------------|
+| `appKey`                  | **Required**. App Key from your iSolarCloud developer portal.                                                |
+| `secretKey`               | **Required**. Secret Key from your iSolarCloud developer portal.                                             |
+| `plantId`                 | **Required**. The numeric site ID (used in `ps_key_list`).                                                   |
+| `plantSN`                 | **Required**. The station’s serial number for detail calls (`getPowerStationDetail`).                        |
+| `userName`                | **Required**. iSolarCloud account username.                                                                  |
+| `userPassword`            | **Required**. iSolarCloud account password.                                                                  |
+| `portalUrl`               | **Optional**. Default is `https://gateway.isolarcloud.eu`; change if you have a different region’s endpoint. |
+| `updateInterval`          | **Optional**. Interval (in ms) for refreshing real-time data. Default is `10 * 1000` (10 seconds).           |
+| `updateIntervalBasicData` | **Optional**. Interval for less-frequent data (e.g., day stats). Default is `15 * 60 * 1000` (15 minutes).   |
+| `showDayEnergy`           | **Optional**. If `true`, fetch daily stats (production, consumption, etc.). Default is `true`.               |
+| `showOverview`            | **Optional**. If `true`, fetch a separate overview dataset. Default is `false` (placeholder in code).        |
+| `compactMode`             | **Optional**. A UI style toggle. Default is `false`.                                                         |
+| `decimal`                 | **Optional**. `"comma"` or `"period"`. Controls how numbers are displayed. Default is `"comma"`.             |
+
+
+---
+
+## API Calls & Data Flow
+
+- **`fetchCurrentPowerData()`** – Retrieves real-time flow for PV, Battery, Load, and Grid from `/openapi/getDeviceRealTimeData`.
+- **`fetchDetailsData()`** – Gets site details (address, design capacity, etc.) from `/openapi/getPowerStationDetail`.
+- **`fetchDayEnergyData()`** – (Optional) Retrieves daily stats (Production, Consumption, FeedIn, Purchased, SelfConsumption).
+
+---
+
+## Example log output
+````
+[2025-01-11 17:17:06.619] [LOG]   [MMM-SunGrow] Received config successfully
+[2025-01-11 17:17:06.619] [LOG]   [MMM-SunGrow] Waiting for ongoing login to finish...
+[2025-01-11 17:17:06.631] [INFO]  Checking git for module: MMM-SunGrow
+[2025-01-11 17:17:07.026] [LOG]   [MMM-SunGrow] /openapi/login success
+[2025-01-11 17:17:07.131] [LOG]   [MMM-SunGrow] fetchDayEnergyData() - calling getDeviceRealTimeData for daily stats
+``````
+
+
+
+
+---
+
+## Troubleshooting
+
+1. **401 / Unauthorized**
+    - Verify only **one** active token. The module tries to manage logins so tokens don’t clash.
+    - Double-check `appKey`/`secretKey` and `portalUrl`.
+
+2. **No data**
+    - Confirm your station is actually online.
+    - Check logs (`npm start dev` or `pm2 logs`) for errors.
+
+3. **Decimal symbol**
+    - Switch `decimal` to `"comma"` or `"period"` if you see the wrong format.
+
+---
+
+## License
+
+MIT License - see [LICENSE](https://github.com/GhostTalker/MMM-SunGrow/blob/main/LICENSE.txt) for details.
+
+Enjoy your **SunGrow** stats on MagicMirror!

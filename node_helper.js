@@ -36,7 +36,9 @@ module.exports = NodeHelper.create({
     if (notification === "SUN_GROW_CONFIG") {
       // Save the config
       this.config = payload;
-      console.log("[MMM-SunGrow] Received config:", this.config);
+      // DEBUG
+      // console.log("[MMM-SunGrow] Received config:", this.config);
+      console.log("[MMM-SunGrow] Received config successfully");
       return;
     }
 
@@ -143,7 +145,9 @@ module.exports = NodeHelper.create({
       }
 
       this.token = loginData.result_data.token;
-      console.log("[MMM-SunGrow] /openapi/login success, token:", this.token);
+      //DEGBUG
+      //console.log("[MMM-SunGrow] /openapi/login success, token:", this.token);
+      console.log("[MMM-SunGrow] /openapi/login success";
 
     } catch (error) {
       console.error("[MMM-SunGrow] Error in loginToISolarCloud:", error);
