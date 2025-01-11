@@ -240,7 +240,7 @@ module.exports = NodeHelper.create({
     }
 
     try {
-      const url = `${this.config.portalUrl}/openapi/getBatteryMeasuringPoints`;
+      const url = `${this.config.portalUrl}/openapi/getDeviceRealTimeData`;
       const body = {
         appkey: this.config.appKey || "",
         device_type: "43",
