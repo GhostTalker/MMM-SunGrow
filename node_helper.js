@@ -300,7 +300,8 @@ module.exports = NodeHelper.create({
       // 1) Battery charging/discharging
       const batteryChargingPower = parseFloat(dp.p13126) || 0;
       const batteryDischargingPower = parseFloat(dp.p13150) || 0;
-      const batterySoC = parseFloat(dp.p13141) || 0; // 0..1 in fraction or 0..100?
+      const batterySoCFrac = parseFloat(dp.p13141) || 0;
+      const batterySoCPercent = batterySoCFrac * 100;
       // 2) Load Power
       const loadPowerW = parseFloat(dp.p13119) || 0;
       // 3) PV Power
@@ -348,7 +349,7 @@ module.exports = NodeHelper.create({
       // Build final structure
       const transformed = {
         siteCurrentPowerFlow: {
-          STORAGE: { currentPower: batteryPowerW, status: "Active", chargeLevel: batterySoC },
+          STORAGE: { currentPower: batteryPowerW, status: "Active", chargeLevel: batterySoCPercent },
           PV:      { currentPower: pvPowerW,      status: "Active" },
           LOAD:    { currentPower: loadPowerW,    status: "Active" },
           GRID:    { currentPower: gridPowerW,    status: "Active" },
